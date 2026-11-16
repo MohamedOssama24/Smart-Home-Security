@@ -1,0 +1,311 @@
+{
+  "app": {
+    "name": "Smart Home Security Check",
+    "language": "Language",
+    "navigation": "Main navigation",
+    "languages": { "it": "Italiano", "en": "English" }
+  },
+  "nav": {
+    "homes": "Homes",
+    "customers": "Customers",
+    "users": "Users",
+    "organization": "Organization",
+    "account": "Account",
+    "status": "System status",
+    "logout": "Sign out"
+  },
+  "systemStatus": {
+    "title": "System status",
+    "description": "Checks that the Smart Home Security Check service is reachable.",
+    "backend": "API service",
+    "checking": "Checking…",
+    "refresh": "Check again",
+    "state": {
+      "UP": "Operational",
+      "DOWN": "Not ready",
+      "UNREACHABLE": "Unreachable"
+    }
+  },
+  "auth": {
+    "fields": {
+      "email": "E-mail",
+      "password": "Password",
+      "displayName": "Name",
+      "organization": "Company name"
+    },
+    "login": {
+      "title": "Sign in",
+      "submit": "Sign in",
+      "forgot": "Forgot your password?",
+      "register": "Create an account",
+      "expired": "Your session has expired. Please sign in again."
+    },
+    "register": {
+      "title": "Create an account",
+      "accountType": "Account type",
+      "individual": "Personal (my home)",
+      "business": "Business (installer, MSP)",
+      "submit": "Sign up",
+      "done": "If the address is valid you will receive an e-mail with a link to activate the account (valid 24 hours).",
+      "toLogin": "Go to sign in",
+      "haveAccount": "Already have an account? Sign in"
+    },
+    "verify": {
+      "title": "Confirm e-mail",
+      "working": "Verifying…",
+      "done": "Address confirmed. You can now sign in.",
+      "resend": "Send the confirmation e-mail again",
+      "resent": "If the account is waiting for confirmation you will receive a new e-mail."
+    },
+    "forgot": {
+      "title": "Forgot password",
+      "description": "Enter the e-mail of your account: we will send you a link to set a new password.",
+      "submit": "Send link",
+      "sent": "If the address is registered you will receive an e-mail with the link (valid 30 minutes)."
+    },
+    "reset": {
+      "title": "New password",
+      "newPassword": "New password",
+      "submit": "Set password",
+      "done": "Password updated. All open sessions were closed: sign in with the new password."
+    },
+    "invitation": {
+      "title": "Activate your account",
+      "description": "You have been invited to use Smart Home Security Check. Choose the password of your account.",
+      "submit": "Set password and activate",
+      "done": "Account activated. You can now sign in with your e-mail and the password you chose."
+    },
+    "password": {
+      "hint": "At least {{min}} characters. A long sentence beats a complicated word.",
+      "PASSWORD_TOO_SHORT": "The password is too short.",
+      "PASSWORD_TOO_LONG": "The password is too long (max 128 characters).",
+      "PASSWORD_TOO_COMMON": "This password is among the most used ones: choose another.",
+      "PASSWORD_TOO_SIMPLE": "The password is too simple (repeated or sequential characters).",
+      "PASSWORD_CONTAINS_PERSONAL_DATA": "The password must not contain your name or e-mail."
+    }
+  },
+  "account": {
+    "title": "Your account",
+    "password": {
+      "title": "Change password",
+      "current": "Current password",
+      "new": "New password",
+      "submit": "Change password",
+      "done": "Password changed. Other sessions were closed."
+    },
+    "sessions": {
+      "title": "Active sessions",
+      "description": "Devices and browsers you are signed in with.",
+      "device": "Device",
+      "lastUsed": "Last used",
+      "ip": "IP address",
+      "current": "This session",
+      "unknownDevice": "Unknown device",
+      "revoke": "Sign out",
+      "revokeOthers": "Sign out other devices",
+      "revokeAll": "Sign out everywhere"
+    }
+  },
+  "roles": {
+    "SUPER_ADMIN": "Super administrator",
+    "ORGANIZATION_ADMIN": "Organization administrator",
+    "TECHNICIAN": "Technician",
+    "CUSTOMER": "Customer",
+    "READ_ONLY": "Read only"
+  },
+  "homes": {
+    "title": "Homes",
+    "empty": "No homes yet. Create one to connect the local agent.",
+    "emptyNoCreate": "No homes are available to your account.",
+    "ofCustomer": "Homes of customer {{name}}",
+    "all": "Show all",
+    "archiveConfirm": "The home will be archived and no longer visible. Confirm?",
+    "fields": {
+      "name": "Name",
+      "customer": "Customer",
+      "noCustomer": "No customer (internal use)",
+      "address": "Address",
+      "timezone": "Time zone"
+    },
+    "create": {
+      "title": "New home",
+      "name": "Name (e.g. Beach house)",
+      "submit": "Create"
+    }
+  },
+  "networks": {
+    "title": "Networks",
+    "description": "Declare the local networks of this home. Only private ranges are accepted (e.g. 192.168.1.0/24). Declaring or authorizing a network never starts a scan.",
+    "empty": "No networks declared.",
+    "name": "Name",
+    "cidr": "Range (CIDR)",
+    "cidrHint": "Only private IPv4 networks (10.x, 172.16-31.x, 192.168.x, /22 or smaller) or local IPv6 (fc00::/7, fe80::/10, prefix /64 or smaller).",
+    "kindLabel": "Type",
+    "kind": { "WIFI": "Wi-Fi", "ETHERNET": "Wired", "VLAN": "VLAN", "GUEST": "Guest", "UNKNOWN": "Not specified" },
+    "authorization": "Authorization",
+    "authorized": "Authorized",
+    "notAuthorized": "Not authorized",
+    "authorize": "Authorize",
+    "authorizeConfirm": "Confirm and authorize",
+    "revoke": "Revoke authorization",
+    "deleteConfirm": "Yes, delete",
+    "add": "Add a network",
+    "addSubmit": "Add",
+    "attestation": {
+      "v1": "I declare that I own the network {{cidr}} or that I have been authorized in writing by its owner to check its security, and I take responsibility for this statement."
+    },
+    "attestationNote": "The statement is recorded with date, time and user. Checks will always be non-invasive and you can revoke the authorization at any time."
+  },
+  "customers": {
+    "title": "Customers",
+    "empty": "No customers.",
+    "name": "Name or company name",
+    "contact": "Contacts",
+    "email": "Contact e-mail",
+    "phone": "Phone",
+    "notes": "Notes",
+    "notesHint": "Do not enter passwords or other sensitive data.",
+    "create": "Create customer",
+    "createTitle": "New customer",
+    "editTitle": "Edit customer",
+    "archiveConfirm": "The customer will be archived. Confirm?"
+  },
+  "organization": {
+    "plan": {
+      "title": "{{plan}} plan",
+      "homes": "Homes",
+      "users": "Users",
+      "customers": "Customers",
+      "networksPerHome": "Networks per home",
+      "unlimited": "unlimited",
+      "note": "Limits apply to new creations; disabled users and archived items are not counted."
+    },
+    "details": {
+      "title": "Organization details",
+      "legalName": "Company name",
+      "vatNumber": "VAT number",
+      "contactEmail": "Contact e-mail",
+      "contactPhone": "Phone",
+      "saved": "Details saved."
+    }
+  },
+  "users": {
+    "title": "Users",
+    "user": "User",
+    "roles": "Roles",
+    "status": "Status",
+    "lastLogin": "Last sign-in:",
+    "noRoles": "No roles",
+    "role": "Role",
+    "scope": "Scope",
+    "scopeTarget": "Item",
+    "scopeType": {
+      "PLATFORM": "Platform",
+      "TENANT": "Whole organization",
+      "ORGANIZATION": "Organization",
+      "CUSTOMER": "One customer",
+      "HOME": "One home"
+    },
+    "scopeOf": {
+      "ORGANIZATION": "Organization",
+      "CUSTOMER": "Customer {{name}}",
+      "HOME": "Home {{name}}"
+    },
+    "state": {
+      "ACTIVE": "Active",
+      "PENDING_VERIFICATION": "Waiting for confirmation",
+      "DISABLED": "Disabled",
+      "INVITED": "Invitation sent"
+    },
+    "resend": "Resend invitation",
+    "addRole": "Add role",
+    "addRoleTitle": "New role for {{name}}",
+    "removeRole": "Remove role",
+    "removeRoleConfirm": "Remove",
+    "enable": "Enable",
+    "disable": "Disable",
+    "disableConfirm": "The user will be signed out of every device immediately. Confirm?",
+    "disableConfirmYes": "Yes, disable",
+    "invite": {
+      "title": "Invite a user",
+      "description": "The user will receive an e-mail with a link (valid 7 days) to choose their own password.",
+      "submit": "Send invitation",
+      "sent": "Invitation sent.",
+      "resent": "New invitation sent: the previous link no longer works."
+    }
+  },
+  "common": {
+    "save": "Save",
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "archive": "Archive",
+    "confirmArchive": "Yes, archive"
+  },
+  "agents": {
+    "title": "Local agents",
+    "empty": "No agent connected to this home.",
+    "name": "Name",
+    "system": "System",
+    "lastSeen": "Last contact",
+    "status": "Status",
+    "revoke": "Revoke",
+    "revokeConfirm": "The agent will have to be enrolled again. Continue?",
+    "revokeConfirmYes": "Yes, revoke",
+    "revokeCancel": "Cancel",
+    "state": { "ACTIVE": "Active", "REVOKED": "Revoked" },
+    "tokenState": { "ACTIVE": "Valid", "USED": "Used", "EXPIRED": "Expired", "REVOKED": "Revoked" },
+    "enroll": {
+      "title": "Connect an agent",
+      "description": "Generate a one-time code and use it to register the agent installed on a computer of this network. The code expires after 30 minutes.",
+      "create": "Generate enrollment code",
+      "showOnce": "Copy the code now: it will not be shown again. It expires at {{expires}}.",
+      "command": "Save it to a file (e.g. token.txt) and run on the agent computer:",
+      "createdAt": "Created",
+      "expiresAt": "Expires",
+      "revoke": "Cancel"
+    }
+  },
+  "errors": {
+    "GENERIC": "Something went wrong. Please try again.",
+    "NETWORK": "The service is unreachable. Check your connection.",
+    "INVALID_CREDENTIALS": "E-mail or password is not correct.",
+    "EMAIL_NOT_VERIFIED": "You need to confirm your e-mail address first.",
+    "TOO_MANY_ATTEMPTS": "Too many attempts. Try again in {{seconds}} seconds.",
+    "PASSWORD_POLICY": "The password does not meet the security requirements:",
+    "INVALID_TOKEN": "The link is not valid or has expired.",
+    "INVALID_CURRENT_PASSWORD": "The current password is not correct.",
+    "PASSWORD_UNCHANGED": "The new password must differ from the current one.",
+    "ORGANIZATION_NAME_REQUIRED": "A business account needs a company name.",
+    "VALIDATION_FAILED": "Some fields are not valid.",
+    "CSRF_INVALID": "Invalid request. Reload the page and try again.",
+    "FORBIDDEN": "You are not allowed to perform this operation.",
+    "NOT_FOUND": "Item not found.",
+    "TOKEN_ALREADY_USED": "The code was already used.",
+    "UNAUTHENTICATED": "Please sign in.",
+    "INVALID_REFRESH_TOKEN": "Your session has expired. Please sign in again.",
+    "PLAN_LIMIT_REACHED": "You have reached the limit of your plan.",
+    "EMAIL_ALREADY_REGISTERED": "An account with this e-mail already exists.",
+    "NETWORK_OVERLAP": "The network overlaps another network of this home.",
+    "NETWORK_NOT_PRIVATE": "Only private or local networks are allowed: public addresses cannot be declared.",
+    "NETWORK_TOO_LARGE": "The network is too large (at most /22 for IPv4, /64 for IPv6).",
+    "NETWORK_ALREADY_AUTHORIZED": "The network is already authorized.",
+    "NETWORK_NOT_AUTHORIZED": "The network is not authorized.",
+    "ATTESTATION_REQUIRED": "To authorize the network you must confirm the statement.",
+    "ATTESTATION_OUTDATED": "The statement text has changed: reload the page.",
+    "CUSTOMER_HAS_HOMES": "The customer still has homes: archive or move them first.",
+    "HOME_HAS_ACTIVE_AGENTS": "The home still has active agents: revoke them before archiving it.",
+    "LAST_ADMIN": "You cannot remove the last administrator of the organization.",
+    "CANNOT_DISABLE_SELF": "You cannot disable your own account.",
+    "INVALID_CIDR": "Invalid range: use CIDR notation (e.g. 192.168.1.0/24).",
+    "INVALID_TIMEZONE": "Invalid time zone (e.g. Europe/Rome).",
+    "INVALID_VAT_NUMBER": "Invalid VAT number.",
+    "INVALID_CUSTOMER": "Invalid customer.",
+    "INVITATION_NOT_PENDING": "The user has already activated the account.",
+    "BUSINESS_TENANT_REQUIRED": "Available only for business accounts.",
+    "INVALID_SCOPE": "Invalid scope for this role.",
+    "ROLE_ALREADY_ASSIGNED": "The user already has this role.",
+    "INVALID_STATUS": "Invalid status.",
+    "UNKNOWN_ROLE": "Unknown role."
+  }
+}

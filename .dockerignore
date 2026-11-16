@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+!.env.example
+backups/
+**/node_modules
+**/dist
+**/.angular
+**/target
+agent/go-security-agent/bin
+mobile/
+docs/

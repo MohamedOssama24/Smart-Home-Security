@@ -1,0 +1,37 @@
+<header class="topbar">
+  <a class="brand" routerLink="/">{{ 'app.name' | transloco }}</a>
+  @if (auth.isAuthenticated()) {
+    <nav class="nav" [attr.aria-label]="'app.navigation' | transloco">
+      <a routerLink="/homes" routerLinkActive="active">{{ 'nav.homes' | transloco }}</a>
+      @if (showCustomers()) {
+        <a routerLink="/customers" routerLinkActive="active">{{ 'nav.customers' | transloco }}</a>
+      }
+      @if (showUsers()) {
+        <a routerLink="/users" routerLinkActive="active">{{ 'nav.users' | transloco }}</a>
+      }
+      @if (auth.hasPermission('tenant:read')) {
+        <a routerLink="/organization" routerLinkActive="active">{{ 'nav.organization' | transloco }}</a>
+      }
+      <a routerLink="/account" routerLinkActive="active">{{ 'nav.account' | transloco }}</a>
+      <a routerLink="/system-status" routerLinkActive="active">{{ 'nav.status' | transloco }}</a>
+    </nav>
+  }
+  <div class="right">
+    <label class="lang">
+      <span class="visually-hidden">{{ 'app.language' | transloco }}</span>
+      <select [value]="language.current()" (change)="onLanguageChange($any($event.target).value)">
+        @for (lang of languages; track lang) {
+          <option [value]="lang">{{ 'app.languages.' + lang | transloco }}</option>
+        }
+      </select>
+    </label>
+    @if (auth.me(); as me) {
+      <span class="user" data-testid="current-user">{{ me.displayName }}</span>
+      <button type="button" (click)="logout()" data-testid="logout">{{ 'nav.logout' | transloco }}</button>
+    }
+  </div>
+</header>
+
+<main class="content">
+  <router-outlet />
+</main>

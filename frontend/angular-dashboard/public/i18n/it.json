@@ -1,0 +1,311 @@
+{
+  "app": {
+    "name": "Smart Home Security Check",
+    "language": "Lingua",
+    "navigation": "Navigazione principale",
+    "languages": { "it": "Italiano", "en": "English" }
+  },
+  "nav": {
+    "homes": "Abitazioni",
+    "customers": "Clienti",
+    "users": "Utenti",
+    "organization": "Organizzazione",
+    "account": "Account",
+    "status": "Stato sistema",
+    "logout": "Esci"
+  },
+  "systemStatus": {
+    "title": "Stato del sistema",
+    "description": "Verifica che il servizio Smart Home Security Check sia raggiungibile.",
+    "backend": "Servizio API",
+    "checking": "Verifica in corso…",
+    "refresh": "Verifica di nuovo",
+    "state": {
+      "UP": "Operativo",
+      "DOWN": "Non pronto",
+      "UNREACHABLE": "Non raggiungibile"
+    }
+  },
+  "auth": {
+    "fields": {
+      "email": "Email",
+      "password": "Password",
+      "displayName": "Nome",
+      "organization": "Ragione sociale"
+    },
+    "login": {
+      "title": "Accedi",
+      "submit": "Accedi",
+      "forgot": "Password dimenticata?",
+      "register": "Crea un account",
+      "expired": "La sessione è scaduta. Accedi di nuovo."
+    },
+    "register": {
+      "title": "Crea un account",
+      "accountType": "Tipo di account",
+      "individual": "Privato (la mia casa)",
+      "business": "Azienda (installatore, MSP)",
+      "submit": "Registrati",
+      "done": "Se l'indirizzo è valido riceverai un'email con il link per attivare l'account (valido 24 ore).",
+      "toLogin": "Vai all'accesso",
+      "haveAccount": "Hai già un account? Accedi"
+    },
+    "verify": {
+      "title": "Conferma email",
+      "working": "Verifica in corso…",
+      "done": "Indirizzo confermato. Ora puoi accedere.",
+      "resend": "Invia di nuovo l'email di conferma",
+      "resent": "Se l'account è in attesa di conferma riceverai una nuova email."
+    },
+    "forgot": {
+      "title": "Password dimenticata",
+      "description": "Inserisci l'email dell'account: ti invieremo un link per impostare una nuova password.",
+      "submit": "Invia il link",
+      "sent": "Se l'indirizzo è registrato riceverai un'email con il link (valido 30 minuti)."
+    },
+    "reset": {
+      "title": "Nuova password",
+      "newPassword": "Nuova password",
+      "submit": "Imposta la password",
+      "done": "Password aggiornata. Tutte le sessioni aperte sono state chiuse: accedi con la nuova password."
+    },
+    "invitation": {
+      "title": "Attiva il tuo account",
+      "description": "Sei stato invitato a usare Smart Home Security Check. Scegli la password del tuo account.",
+      "submit": "Imposta la password e attiva",
+      "done": "Account attivato. Ora puoi accedere con la tua email e la password scelta."
+    },
+    "password": {
+      "hint": "Almeno {{min}} caratteri. Meglio una frase lunga che una parola complicata.",
+      "PASSWORD_TOO_SHORT": "La password è troppo corta.",
+      "PASSWORD_TOO_LONG": "La password è troppo lunga (massimo 128 caratteri).",
+      "PASSWORD_TOO_COMMON": "La password è tra quelle più usate: scegline un'altra.",
+      "PASSWORD_TOO_SIMPLE": "La password è troppo semplice (caratteri ripetuti o in sequenza).",
+      "PASSWORD_CONTAINS_PERSONAL_DATA": "La password non deve contenere il tuo nome o la tua email."
+    }
+  },
+  "account": {
+    "title": "Il tuo account",
+    "password": {
+      "title": "Cambia password",
+      "current": "Password attuale",
+      "new": "Nuova password",
+      "submit": "Cambia password",
+      "done": "Password cambiata. Le altre sessioni sono state chiuse."
+    },
+    "sessions": {
+      "title": "Sessioni attive",
+      "description": "Dispositivi e browser con cui hai effettuato l'accesso.",
+      "device": "Dispositivo",
+      "lastUsed": "Ultimo utilizzo",
+      "ip": "Indirizzo IP",
+      "current": "Questa sessione",
+      "unknownDevice": "Dispositivo sconosciuto",
+      "revoke": "Disconnetti",
+      "revokeOthers": "Disconnetti gli altri dispositivi",
+      "revokeAll": "Disconnetti ovunque"
+    }
+  },
+  "roles": {
+    "SUPER_ADMIN": "Super amministratore",
+    "ORGANIZATION_ADMIN": "Amministratore organizzazione",
+    "TECHNICIAN": "Tecnico",
+    "CUSTOMER": "Cliente",
+    "READ_ONLY": "Sola lettura"
+  },
+  "homes": {
+    "title": "Abitazioni",
+    "empty": "Nessuna abitazione. Creane una per collegare l'agent locale.",
+    "emptyNoCreate": "Nessuna abitazione disponibile per il tuo account.",
+    "ofCustomer": "Abitazioni del cliente {{name}}",
+    "all": "Mostra tutte",
+    "archiveConfirm": "L'abitazione verrà archiviata e non sarà più visibile. Confermi?",
+    "fields": {
+      "name": "Nome",
+      "customer": "Cliente",
+      "noCustomer": "Nessun cliente (uso interno)",
+      "address": "Indirizzo",
+      "timezone": "Fuso orario"
+    },
+    "create": {
+      "title": "Nuova abitazione",
+      "name": "Nome (es. Casa al mare)",
+      "submit": "Crea"
+    }
+  },
+  "networks": {
+    "title": "Reti",
+    "description": "Dichiara le reti locali di questa abitazione. Sono accettati solo intervalli privati (es. 192.168.1.0/24). Dichiarare o autorizzare una rete non avvia alcuna scansione.",
+    "empty": "Nessuna rete dichiarata.",
+    "name": "Nome",
+    "cidr": "Intervallo (CIDR)",
+    "cidrHint": "Solo reti private IPv4 (10.x, 172.16-31.x, 192.168.x, /22 o più piccole) o IPv6 locali (fc00::/7, fe80::/10, prefisso /64 o più piccolo).",
+    "kindLabel": "Tipo",
+    "kind": { "WIFI": "Wi-Fi", "ETHERNET": "Cablata", "VLAN": "VLAN", "GUEST": "Ospiti", "UNKNOWN": "Non specificato" },
+    "authorization": "Autorizzazione",
+    "authorized": "Autorizzata",
+    "notAuthorized": "Non autorizzata",
+    "authorize": "Autorizza",
+    "authorizeConfirm": "Confermo e autorizzo",
+    "revoke": "Revoca autorizzazione",
+    "deleteConfirm": "Sì, elimina",
+    "add": "Aggiungi una rete",
+    "addSubmit": "Aggiungi",
+    "attestation": {
+      "v1": "Dichiaro di essere il proprietario della rete {{cidr}} o di essere stato autorizzato per iscritto dal proprietario a verificarne la sicurezza, e mi assumo la responsabilità di questa dichiarazione."
+    },
+    "attestationNote": "La dichiarazione viene registrata con data, ora e utente. Le verifiche saranno sempre non invasive e potrai revocare l'autorizzazione in qualsiasi momento."
+  },
+  "customers": {
+    "title": "Clienti",
+    "empty": "Nessun cliente.",
+    "name": "Nome o ragione sociale",
+    "contact": "Contatti",
+    "email": "Email di contatto",
+    "phone": "Telefono",
+    "notes": "Note",
+    "notesHint": "Non inserire password o altri dati sensibili.",
+    "create": "Crea cliente",
+    "createTitle": "Nuovo cliente",
+    "editTitle": "Modifica cliente",
+    "archiveConfirm": "Il cliente verrà archiviato. Confermi?"
+  },
+  "organization": {
+    "plan": {
+      "title": "Piano {{plan}}",
+      "homes": "Abitazioni",
+      "users": "Utenti",
+      "customers": "Clienti",
+      "networksPerHome": "Reti per abitazione",
+      "unlimited": "illimitato",
+      "note": "I limiti valgono per le nuove creazioni; utenti disattivati e elementi archiviati non vengono conteggiati."
+    },
+    "details": {
+      "title": "Dati dell'organizzazione",
+      "legalName": "Ragione sociale",
+      "vatNumber": "Partita IVA",
+      "contactEmail": "Email di contatto",
+      "contactPhone": "Telefono",
+      "saved": "Dati salvati."
+    }
+  },
+  "users": {
+    "title": "Utenti",
+    "user": "Utente",
+    "roles": "Ruoli",
+    "status": "Stato",
+    "lastLogin": "Ultimo accesso:",
+    "noRoles": "Nessun ruolo",
+    "role": "Ruolo",
+    "scope": "Ambito",
+    "scopeTarget": "Elemento",
+    "scopeType": {
+      "PLATFORM": "Piattaforma",
+      "TENANT": "Tutta l'organizzazione",
+      "ORGANIZATION": "Organizzazione",
+      "CUSTOMER": "Un cliente",
+      "HOME": "Un'abitazione"
+    },
+    "scopeOf": {
+      "ORGANIZATION": "Organizzazione",
+      "CUSTOMER": "Cliente {{name}}",
+      "HOME": "Abitazione {{name}}"
+    },
+    "state": {
+      "ACTIVE": "Attivo",
+      "PENDING_VERIFICATION": "In attesa di conferma",
+      "DISABLED": "Disattivato",
+      "INVITED": "Invito inviato"
+    },
+    "resend": "Rinvia invito",
+    "addRole": "Aggiungi ruolo",
+    "addRoleTitle": "Nuovo ruolo per {{name}}",
+    "removeRole": "Rimuovi ruolo",
+    "removeRoleConfirm": "Rimuovi",
+    "enable": "Riattiva",
+    "disable": "Disattiva",
+    "disableConfirm": "L'utente verrà disconnesso subito da tutti i dispositivi. Confermi?",
+    "disableConfirmYes": "Sì, disattiva",
+    "invite": {
+      "title": "Invita un utente",
+      "description": "L'utente riceverà un'email con un link (valido 7 giorni) per scegliere la propria password.",
+      "submit": "Invia invito",
+      "sent": "Invito inviato.",
+      "resent": "Nuovo invito inviato: il link precedente non è più valido."
+    }
+  },
+  "common": {
+    "save": "Salva",
+    "edit": "Modifica",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "archive": "Archivia",
+    "confirmArchive": "Sì, archivia"
+  },
+  "agents": {
+    "title": "Agent locali",
+    "empty": "Nessun agent collegato a questa abitazione.",
+    "name": "Nome",
+    "system": "Sistema",
+    "lastSeen": "Ultimo contatto",
+    "status": "Stato",
+    "revoke": "Revoca",
+    "revokeConfirm": "L'agent dovrà essere registrato di nuovo. Confermi?",
+    "revokeConfirmYes": "Sì, revoca",
+    "revokeCancel": "Annulla",
+    "state": { "ACTIVE": "Attivo", "REVOKED": "Revocato" },
+    "tokenState": { "ACTIVE": "Valido", "USED": "Usato", "EXPIRED": "Scaduto", "REVOKED": "Revocato" },
+    "enroll": {
+      "title": "Collega un agent",
+      "description": "Genera un codice monouso e usalo per registrare l'agent installato su un computer di questa rete. Il codice scade dopo 30 minuti.",
+      "create": "Genera codice di registrazione",
+      "showOnce": "Copia il codice ora: non verrà mostrato di nuovo. Scade alle {{expires}}.",
+      "command": "Salvalo in un file (es. token.txt) ed esegui sul computer dell'agent:",
+      "createdAt": "Creato",
+      "expiresAt": "Scadenza",
+      "revoke": "Annulla"
+    }
+  },
+  "errors": {
+    "GENERIC": "Si è verificato un errore. Riprova.",
+    "NETWORK": "Il servizio non è raggiungibile. Controlla la connessione.",
+    "INVALID_CREDENTIALS": "Email o password non corrette.",
+    "EMAIL_NOT_VERIFIED": "Devi prima confermare il tuo indirizzo email.",
+    "TOO_MANY_ATTEMPTS": "Troppi tentativi. Riprova tra {{seconds}} secondi.",
+    "PASSWORD_POLICY": "La password non rispetta i requisiti di sicurezza:",
+    "INVALID_TOKEN": "Il link non è valido o è scaduto.",
+    "INVALID_CURRENT_PASSWORD": "La password attuale non è corretta.",
+    "PASSWORD_UNCHANGED": "La nuova password deve essere diversa da quella attuale.",
+    "ORGANIZATION_NAME_REQUIRED": "Per un account aziendale serve la ragione sociale.",
+    "VALIDATION_FAILED": "Alcuni campi non sono validi.",
+    "CSRF_INVALID": "Richiesta non valida. Ricarica la pagina e riprova.",
+    "FORBIDDEN": "Non hai i permessi per questa operazione.",
+    "NOT_FOUND": "Elemento non trovato.",
+    "TOKEN_ALREADY_USED": "Il codice è già stato usato.",
+    "UNAUTHENTICATED": "Devi accedere.",
+    "INVALID_REFRESH_TOKEN": "La sessione è scaduta. Accedi di nuovo.",
+    "PLAN_LIMIT_REACHED": "Hai raggiunto il limite del tuo piano.",
+    "EMAIL_ALREADY_REGISTERED": "Esiste già un account con questa email.",
+    "NETWORK_OVERLAP": "La rete si sovrappone a un'altra rete di questa abitazione.",
+    "NETWORK_NOT_PRIVATE": "Sono ammesse solo reti private o locali: gli indirizzi pubblici non possono essere dichiarati.",
+    "NETWORK_TOO_LARGE": "La rete è troppo grande (massimo /22 per IPv4, /64 per IPv6).",
+    "NETWORK_ALREADY_AUTHORIZED": "La rete è già autorizzata.",
+    "NETWORK_NOT_AUTHORIZED": "La rete non è autorizzata.",
+    "ATTESTATION_REQUIRED": "Per autorizzare la rete devi confermare la dichiarazione.",
+    "ATTESTATION_OUTDATED": "Il testo della dichiarazione è cambiato: ricarica la pagina.",
+    "CUSTOMER_HAS_HOMES": "Il cliente ha ancora delle abitazioni: archiviale o spostale prima.",
+    "HOME_HAS_ACTIVE_AGENTS": "L'abitazione ha ancora agent attivi: revocali prima di archiviarla.",
+    "LAST_ADMIN": "Non puoi rimuovere l'ultimo amministratore dell'organizzazione.",
+    "CANNOT_DISABLE_SELF": "Non puoi disattivare il tuo stesso account.",
+    "INVALID_CIDR": "Intervallo non valido: usa la notazione CIDR (es. 192.168.1.0/24).",
+    "INVALID_TIMEZONE": "Fuso orario non valido (es. Europe/Rome).",
+    "INVALID_VAT_NUMBER": "Partita IVA non valida.",
+    "INVALID_CUSTOMER": "Cliente non valido.",
+    "INVITATION_NOT_PENDING": "L'utente ha già attivato l'account.",
+    "BUSINESS_TENANT_REQUIRED": "Funzione disponibile solo per gli account aziendali.",
+    "INVALID_SCOPE": "Ambito non valido per questo ruolo.",
+    "ROLE_ALREADY_ASSIGNED": "L'utente ha già questo ruolo.",
+    "INVALID_STATUS": "Stato non valido.",
+    "UNKNOWN_ROLE": "Ruolo sconosciuto."
+  }
+}
