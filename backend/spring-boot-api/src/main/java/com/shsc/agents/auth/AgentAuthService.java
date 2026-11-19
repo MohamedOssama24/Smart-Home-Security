@@ -32,6 +32,8 @@ import com.shsc.shared.persistence.SecurityLookups.SecretKind;
 import com.shsc.shared.persistence.TenantScope;
 import com.shsc.shared.web.ApiException;
 import com.shsc.shared.web.ClientInfo;
+import com.shsc.tenancy.PlanLimits;
+import com.shsc.tenancy.PlanLimits.Resource;
 
 /**
  * Local agent authentication, separate from user authentication:
@@ -69,12 +71,14 @@ public class AgentAuthService {
     private final TransactionTemplate tx;
     private final AuthThrottle throttle;
     private final AuditLog audit;
+    private final PlanLimits limits;
     private final ShscProperties.Agent settings;
     private final Clock clock;
 
     public AgentAuthService(AgentRepository agents, HomeRepository homes, SecurityLookups lookups,
             TenantScope tenantScope, TransactionTemplate tx, AuthThrottle throttle, AuditLog audit,
-            ShscProperties properties, Clock clock) {
+            PlanLimits limits, ShscProperties properties, Clock clock) {
+        this.limits = limits;
         this.agents = agents;
         this.homes = homes;
         this.lookups = lookups;
@@ -110,6 +114,8 @@ public class AgentAuthService {
                 if (token == null || !"ACTIVE".equals(token.state(now)) || homes.find(token.homeId()).isEmpty()) {
                     return null;
                 }
+                // plan limit of active agents per home, under the tenant lock (concurrent enrollments)
+                limits.requireCapacity(Resource.AGENTS_PER_HOME, token.homeId());
                 String name = firstNonBlank(request.name(), request.hostname(), "agent");
                 UUID agentId = agents.insertAgent(tenantId.get(), token.homeId(), name, request.hostname(),
                         request.os(), request.arch(), request.agentVersion(), now);

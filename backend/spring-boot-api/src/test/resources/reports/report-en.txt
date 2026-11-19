@@ -1,0 +1,50 @@
+Security report
+Home: Casa MOCK
+Generated on 2026-11-18 11:15 (Europe/Rome)
+Scan: Standard (common ports), completed on 2026-11-18 11:00 (Europe/Rome)
+Summary
+58
+Security score: 58/100 - High risk (Poor)
+The score goes from 0 to 100: 100 means that no known issue was found. It depends on what the scan
+could check, so it always comes with the coverage.
+Analysis coverage: 60% (3 devices analyzed out of 4 found)
+Provisional score: the coverage is low, so some risks may not have been detected.
+Open issues: 1 critical, 1 high, 0 medium, 0 low, 0 informational.
+Issues marked as accepted risk (not counted in the score): 1.
+Issues are reported as they were when the report was generated.
+Issues to fix
+CVE-2099-3001 in MOCK rtspd 1.0
+Severity: Critical - Confirmed vulnerability - Status: Acknowledged
+Device: mock-camera (192.168.90.30)
+What it means: The version declared by the service falls within a known vulnerability.
+What to do: Update the device firmware or software to the latest available version; if there is no update, restrict
+access to the service.
+Telnet enabled on port 23
+Severity: High - Suspicious configuration - Status: Open
+Device: mock-router (192.168.90.1)
+What it means: Telnet sends passwords and commands in clear text: anyone on the same network can read them.
+It is also a common target of IoT malware.
+What to do: Disable Telnet in the device settings and use SSH or the official app. If that is not possible, update the
+firmware or consider replacing the device.
+Devices found (4)
+Name IP address Category Manufacturer
+mock-router 192.168.90.1 Router MOCK Networks
+mock-camera 192.168.90.30 IP camera -
+tv-?-? 192.168.90.40 Smart TV MOCK ? TV
+a-very-long-hostname-without-spaces-tha
+t-does-not-fit-the-column.mock.example.t
+est
+192.168.90.41 Unidentified -
+Limits of the analysis
+- The analysis only sees the networks the agent is connected to: separate networks (guest, VLAN, IoT) are not
+checked without an agent there.
+- Devices that are off, in standby or isolated by the Wi-Fi may not answer during the scan.
+Smart Home Security Check - Casa MOCK - page 1 of 2
+- Zigbee, Z-Wave, Bluetooth and Thread devices are not visible: they do not use the IP network.
+- Model and firmware version are often not exposed: in these cases an issue is reported as potential, not confirmed.
+Information declared by the devices may be inaccurate.
+- From inside the home it is not possible to know for sure what is reachable from the Internet: only the automatic
+openings (UPnP) declared by the router are known.
+- The scan does not try passwords, does not exploit vulnerabilities and does not change the devices: a clean result
+does not guarantee the absence of risks.
+Smart Home Security Check - Casa MOCK - page 2 of 2

@@ -101,6 +101,8 @@ export class OrganizationPage implements OnInit {
       rows.push({ key: 'customers', used: t.usage?.customers ?? null, limit: t.plan.maxCustomers });
     }
     rows.push({ key: 'networksPerHome', used: null, limit: t.plan.maxNetworksPerHome });
+    rows.push({ key: 'agentsPerHome', used: null, limit: t.plan.maxAgentsPerHome });
+    rows.push({ key: 'scansPerDay', used: null, limit: t.plan.maxScansPerDay });
     return rows;
   }
 

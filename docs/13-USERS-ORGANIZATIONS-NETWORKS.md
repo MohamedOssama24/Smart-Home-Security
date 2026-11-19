@@ -40,6 +40,13 @@ Ambiti assegnabili:
 - Un utente con `home:write` sul cliente può creare abitazioni **solo per quel cliente**. Spostare un'abitazione tra clienti richiede gli stessi diritti su entrambi.
 - Matrice completa verificata da `RoleAuthorizationMatrixTest`: 25 richieste × 5 profili.
 
+**SUPER_ADMIN (stato attuale).**
+- Ha tutti i permessi con ambito `PLATFORM`.
+- La RLS lo vincola comunque al tenant a cui appartiene: non esiste ancora alcun accesso trasversale tra tenant.
+- Le API `/admin/**` (dedicate, con motivazione registrata e audit) arriveranno in una milestone successiva.
+- Il ruolo non può essere assegnato tramite API (403).
+- Verificato da `CrossTenantIsolationTest`.
+
 ## 3. Limiti del piano FREE
 
 | Risorsa | Limite | Conteggio |
@@ -137,5 +144,6 @@ Le voci di menu e i pulsanti dipendono dai permessi del profilo, ma sono solo un
 - `NetworkManagementTest` (7): reti private, sovrapposizioni, limite per abitazione, attestazione, ruoli e ambiti, isolamento, vincoli DB.
 - `NetworkRangeTest` (33 casi parametrizzati).
 - `RoleAuthorizationMatrixTest`: la matrice per ruolo.
+- `CrossTenantIsolationTest`: test IDOR. L'amministratore di un'altra organizzazione e un SUPER_ADMIN di quel tenant chiamano 25 endpoint (lettura, modifica, eliminazione, cambi di stato) con gli ID reali della vittima e ricevono sempre 404. Gli ID estranei nel corpo delle richieste sono rifiutati (`INVALID_CUSTOMER`, `INVALID_SCOPE`), gli elenchi e l'audit non contengono dati della vittima, e alla fine i dati della vittima risultano invariati.
 
 **Frontend**: spec per utenti, clienti, organizzazione, attivazione account, abitazioni con clienti, reti e attestazione nel dettaglio abitazione.

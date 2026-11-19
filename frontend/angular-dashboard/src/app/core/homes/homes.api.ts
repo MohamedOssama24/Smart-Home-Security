@@ -82,6 +82,43 @@ export interface Agent {
   lastSeenAt: string | null;
   revokedAt: string | null;
   revokeReason: string | null;
+  /** Computed by the backend from the last heartbeat (online < 3 min, stale < 15 min). */
+  connectivity: AgentConnectivity;
+  lastHeartbeatAt: string | null;
+  /** Self-diagnosis of the last heartbeat (null before the first one). */
+  capabilities: AgentCapabilities | null;
+  interfaces: AgentInterface[] | null;
+  queueDepth: number | null;
+  uptimeSeconds: number | null;
+  lastError: string | null;
+}
+
+export type AgentConnectivity = 'ONLINE' | 'STALE' | 'OFFLINE' | 'NEVER_CONNECTED' | 'REVOKED';
+
+export interface AgentCapabilities {
+  privileged: boolean;
+  arp: 'raw' | 'os_api' | 'os_table' | 'unavailable';
+  icmp: 'raw' | 'unprivileged' | 'os_api' | 'unavailable';
+  /** Codes such as ARP_TABLE_ONLY, translated in agents.warning.* */
+  warnings: string[];
+  /** Router integrations configured on the agent (names only, never settings); absent before M7. */
+  routerIntegrations?: ('TR064' | 'SNMP')[] | null;
+}
+
+export interface AgentInterface {
+  name: string;
+  mac?: string;
+  mtu: number;
+  addresses: string[];
+}
+
+/** Event delivered by the agent from its local queue. */
+export interface AgentEvent {
+  id: string;
+  type: string;
+  occurredAt: string;
+  receivedAt: string;
+  detail: Record<string, unknown>;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -158,5 +195,9 @@ export class HomesApi {
 
   revokeAgent(agentId: string, reason: string): Observable<Agent> {
     return this.http.post<Agent>(`/api/v1/agents/${encodeURIComponent(agentId)}/revoke`, { reason });
+  }
+
+  agentEvents(agentId: string): Observable<AgentEvent[]> {
+    return this.http.get<AgentEvent[]>(`/api/v1/agents/${encodeURIComponent(agentId)}/events`);
   }
 }

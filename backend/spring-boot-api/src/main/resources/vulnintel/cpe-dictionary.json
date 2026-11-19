@@ -1,0 +1,17 @@
+{
+  "version": "2026.11-1",
+  "description": "Curated map from the product a service declares (docs/18 §5) to its NVD CPE vendor:product (docs/19 §3). Patterns are case-insensitive and must match the whole product name: no fuzzy matching. versionConfidence is how far the version of that source can be trusted: HIGH (protocol banner) allows a CONFIRMED_VULNERABILITY, MEDIUM (HTTP/RTSP Server header, easy to change or generic) at most a POTENTIAL_RISK. A product never matches on the vendor alone.",
+  "entries": [
+    { "id": "openssh", "services": ["ssh"], "product": "openssh", "cpes": ["openbsd:openssh"], "versionConfidence": "HIGH" },
+    { "id": "dropbear", "services": ["ssh"], "product": "dropbear", "cpes": ["dropbear_ssh_project:dropbear_ssh"], "versionConfidence": "HIGH" },
+    { "id": "lighttpd", "services": ["http", "https"], "product": "lighttpd", "cpes": ["lighttpd:lighttpd"], "versionConfidence": "MEDIUM" },
+    { "id": "nginx", "services": ["http", "https"], "product": "nginx", "cpes": ["f5:nginx", "nginx:nginx"], "versionConfidence": "MEDIUM" },
+    { "id": "apache-httpd", "services": ["http", "https"], "product": "apache", "cpes": ["apache:http_server"], "versionConfidence": "MEDIUM" },
+    { "id": "microsoft-iis", "services": ["http", "https"], "product": "microsoft-iis", "cpes": ["microsoft:internet_information_services"], "versionConfidence": "MEDIUM" },
+    { "id": "boa", "services": ["http", "https"], "product": "boa", "cpes": ["boa:boa"], "versionConfidence": "MEDIUM" },
+    { "id": "goahead", "services": ["http", "https"], "product": "goahead(-webs)?", "cpes": ["embedthis:goahead"], "versionConfidence": "MEDIUM" },
+    { "id": "mini-httpd", "services": ["http", "https"], "product": "mini_httpd", "cpes": ["acme:mini_httpd"], "versionConfidence": "MEDIUM" },
+    { "id": "thttpd", "services": ["http", "https"], "product": "thttpd", "cpes": ["acme:thttpd"], "versionConfidence": "MEDIUM" },
+    { "id": "jetty", "services": ["http", "https"], "product": "jetty", "cpes": ["eclipse:jetty"], "versionConfidence": "MEDIUM" }
+  ]
+}

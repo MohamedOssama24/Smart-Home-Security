@@ -1,5 +1,16 @@
 # 03 — Comunicazione Agent ↔ Backend
 
+> **Stato (Milestone 6)**: job firmati Ed25519 con long polling, ack, progress con lease, annullamento, risultati a lotti idempotenti e chiusura (§6-§8) sono **implementati**; contratto in [15-MANUAL-SCANS.md](15-MANUAL-SCANS.md).
+
+> **Stato (Milestone 7)**: le osservazioni hanno anche `hostname` e `details`; metodi ARP, SELF, ICMP, MDNS, SSDP, UPNP_IGD, NETBIOS, RDNS, NDP, TR064, SNMP; `capabilities.routerIntegrations` riporta solo i nomi delle integrazioni router. Vedi [16-NETWORK-DISCOVERY.md](16-NETWORK-DISCOVERY.md).
+
+> **Stato (Milestone 5)**: enrollment, autenticazione, revoca, rotazione (M3), heartbeat, eventi con coda SQLite locale, autodiagnosi delle capabilities ed esecuzione come servizio sono **implementati**. Contratto esatto in [14-AGENT-RUNTIME.md](14-AGENT-RUNTIME.md). Rispetto al progetto qui sotto:
+> - heartbeat ogni **25 s** (non 60 s), deciso dal server: la credenziale è ricontrollata nel DB a ogni richiesta, senza cache, quindi l'agent scopre la revoca entro 25 s e si ferma (§4–5);
+> - gli eventi dell'agent hanno un endpoint dedicato `POST /agent/events`, idempotente;
+> - servizi realizzati con `golang.org/x/sys` invece di `kardianos/service` (§10);
+> - macOS: chiave in file `0600` di root, non nel Keychain di sistema (§2.3);
+> - le interfacce sono salvate e mostrate, ma non diventano ancora reti candidate (§2.6); job, risultati e aggiornamenti firmati (§6–9) arrivano nelle milestone successive.
+
 ## 1. Principi
 - **Solo connessioni in uscita** dall'agent verso `https://<api>/api/v1/agent/**` (TLS 1.2+, preferibilmente 1.3, verifica certificato obbligatoria, nessun `InsecureSkipVerify`).
 - **Identità dell'agent = coppia di chiavi Ed25519 generata localmente.** La chiave privata non lascia mai la macchina.
@@ -40,7 +51,7 @@ Il job contiene `{scanId, profile, targets, authorizedCidrs, limits{maxHosts, ra
 ## 7. Avanzamento, annullamento, risultati
 - `POST /agent/scans/{id}/ack` → RUNNING, lease.
 - `POST /agent/scans/{id}/progress` ogni ≤ 5 s → risposta `{cancelRequested: bool}`.
-- `POST /agent/scans/{id}/results` a batch (≤ 500 osservazioni o ≤ 2 MB, gzip) con `batchSeq`; ri-invio dello stesso `batchSeq` = no-op.
+- `POST /agent/scans/{id}/results` a batch (≤ 500 osservazioni o ≤ 2 MB, gzip) con `batchSeq`; ri-invio dello stesso `batchSeq` = no-op. Campo opzionale `homeAssistant` (M15) in un batch dedicato senza porte, uno per scansione: vedi [24-INTEGRATIONS.md](24-INTEGRATIONS.md) §3.
 - `POST /agent/scans/{id}/complete {totalBatches, summary, warnings[], errors[], cancelled: bool}`.
 - Il backend valida: JSON schema, dimensioni, che **ogni IP osservato appartenga ai CIDR autorizzati del job** (altrimenti scarto + audit + warning), coerenza `agentId ↔ scan`.
 

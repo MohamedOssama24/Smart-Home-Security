@@ -14,7 +14,10 @@ import { HomeDetailPage } from './home-detail.page';
 const AGENT: Agent = {
   id: 'a1', homeId: 'h1', name: 'PC salotto', hostname: 'pc-salotto', os: 'windows', arch: 'amd64',
   agentVersion: '1.0.0', status: 'ACTIVE', enrolledAt: '2026-11-16T09:00:00Z', lastSeenAt: '2026-11-16T10:00:00Z',
-  revokedAt: null, revokeReason: null,
+  revokedAt: null, revokeReason: null, connectivity: 'ONLINE', lastHeartbeatAt: '2026-11-16T10:00:00Z',
+  capabilities: { privileged: false, arp: 'os_table', icmp: 'os_api', warnings: ['ARP_TABLE_ONLY'] },
+  interfaces: [{ name: 'Ethernet', mac: 'aa:bb:cc:dd:ee:ff', mtu: 1500, addresses: ['192.168.1.20/24'] }],
+  queueDepth: 0, uptimeSeconds: 120, lastError: null,
 };
 
 const HOME: Home = {
@@ -35,7 +38,7 @@ const MANAGER: Me = {
 describe('HomeDetailPage', () => {
   let http: HttpTestingController;
 
-  async function setup(networks: Network[] = [], me: Me = ME) {
+  async function setup(networks: Network[] = [], me: Me = ME, agents: Agent[] = [AGENT]) {
     await TestBed.configureTestingModule({
       imports: [HomeDetailPage, translocoTesting()],
       providers: [
@@ -50,7 +53,7 @@ describe('HomeDetailPage', () => {
     fixture.componentRef.setInput('id', 'h1');
     fixture.detectChanges();
     http.expectOne('/api/v1/homes/h1').flush(HOME);
-    (await nextRequest(http, '/api/v1/homes/h1/agents')).flush([AGENT]);
+    (await nextRequest(http, '/api/v1/homes/h1/agents')).flush(agents);
     if (me.permissions.includes('agent:enroll')) {
       (await nextRequest(http, '/api/v1/homes/h1/agent-enrollment-tokens')).flush([]);
     }
@@ -84,6 +87,44 @@ describe('HomeDetailPage', () => {
 
     expect(fixture.componentInstance.confirmingRevoke()).toBeNull();
     expect(button(page, 'revoke')).toBeNull();
+  });
+
+  it('shows connectivity and, on demand, the self-diagnosis with the recent events', async () => {
+    const fixture = await setup();
+    const page = fixture.nativeElement as HTMLElement;
+    expect(page.querySelector('[data-testid="connectivity"]')?.textContent).toContain('Online');
+    expect(page.querySelector('[data-testid="diagnosis"]')).toBeNull();
+
+    button(page, 'diagnosis-toggle')!.click();
+    (await nextRequest(http, '/api/v1/agents/a1/events')).flush([
+      { id: 'e1', type: 'CONNECTION_RESTORED', occurredAt: '2026-11-16T09:59:00Z', receivedAt: '2026-11-16T10:00:00Z', detail: {} },
+    ]);
+    await settle();
+    fixture.detectChanges();
+
+    const diagnosis = page.querySelector('[data-testid="diagnosis"]')!.textContent!;
+    expect(diagnosis).toContain('Solo tabella del sistema');
+    expect(diagnosis).toContain('alcuni dispositivi potrebbero non essere rilevati');
+    expect(diagnosis).toContain('192.168.1.20/24');
+    expect(page.querySelector('[data-testid="agent-events"]')?.textContent).toContain('Connessione ripristinata');
+
+    button(page, 'diagnosis-toggle')!.click();
+    fixture.detectChanges();
+    expect(page.querySelector('[data-testid="diagnosis"]')).toBeNull();
+  });
+
+  it('marks an agent without recent heartbeats as offline', async () => {
+    const fixture = await setup([], ME, [{ ...AGENT, connectivity: 'OFFLINE', capabilities: null, interfaces: null }]);
+    const page = fixture.nativeElement as HTMLElement;
+    const badge = page.querySelector('[data-testid="connectivity"]')!;
+    expect(badge.textContent).toContain('Offline');
+    expect(badge.classList).toContain('err');
+
+    button(page, 'diagnosis-toggle')!.click();
+    (await nextRequest(http, '/api/v1/agents/a1/events')).flush([]);
+    await settle();
+    fixture.detectChanges();
+    expect(page.querySelector('[data-testid="diagnosis"]')?.textContent).toContain('non ha ancora inviato');
   });
 
   it('authorizes a network only after the explicit, unticked-by-default attestation', async () => {

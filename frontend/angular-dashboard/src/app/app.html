@@ -1,10 +1,28 @@
 <header class="topbar">
-  <a class="brand" routerLink="/">{{ 'app.name' | transloco }}</a>
+  <a class="brand" routerLink="/" data-testid="brand">
+    @if (branding.logo(); as logo) {
+      <img class="brand-logo" [src]="logo" alt="" />
+    }
+    {{ branding.name() ?? ('app.name' | transloco) }}
+  </a>
   @if (auth.isAuthenticated()) {
-    <nav class="nav" [attr.aria-label]="'app.navigation' | transloco">
+    <button type="button" class="menu-toggle" (click)="menuOpen.set(!menuOpen())" [attr.aria-expanded]="menuOpen()"
+            aria-controls="main-nav" data-testid="menu-toggle">☰ <span class="visually-hidden">{{ 'nav.menu' | transloco }}</span></button>
+    <nav id="main-nav" class="nav" [class.open]="menuOpen()" [attr.aria-label]="'app.navigation' | transloco"
+         (click)="menuOpen.set(false)">
+      <a routerLink="/overview" routerLinkActive="active">{{ 'nav.overview' | transloco }}</a>
+      <a routerLink="/alerts" routerLinkActive="active" data-testid="alerts-link">{{ 'nav.alerts' | transloco }}
+        @if (unread.count() > 0) {
+          <span class="badge err" data-testid="unread-count">{{ unread.count() }}</span>
+          <span class="visually-hidden">{{ 'alerts.unread' | transloco }}</span>
+        }
+      </a>
       <a routerLink="/homes" routerLinkActive="active">{{ 'nav.homes' | transloco }}</a>
       @if (showCustomers()) {
         <a routerLink="/customers" routerLinkActive="active">{{ 'nav.customers' | transloco }}</a>
+      }
+      @if (showBilling()) {
+        <a routerLink="/billing" routerLinkActive="active" data-testid="billing-link">{{ 'nav.billing' | transloco }}</a>
       }
       @if (showUsers()) {
         <a routerLink="/users" routerLinkActive="active">{{ 'nav.users' | transloco }}</a>

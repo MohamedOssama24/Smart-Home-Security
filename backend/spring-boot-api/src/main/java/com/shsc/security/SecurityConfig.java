@@ -46,13 +46,21 @@ public class SecurityConfig {
     static final String[] PUBLIC_AUTH_POSTS = {
         "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout",
         "/api/v1/auth/verify-email", "/api/v1/auth/verify-email/resend",
-        "/api/v1/auth/password/forgot", "/api/v1/auth/password/reset", "/api/v1/auth/invitation/accept"
+        "/api/v1/auth/password/forgot", "/api/v1/auth/password/reset", "/api/v1/auth/invitation/accept",
+        "/api/v1/auth/mobile/login", "/api/v1/auth/mobile/refresh", "/api/v1/auth/mobile/logout"
     };
 
-    /** CSRF is enforced on state-changing requests that may carry the refresh cookie. */
+    /** Mobile app: refresh token in the JSON body, never in a cookie (MobileAuthController). */
+    static final String MOBILE_AUTH = "/api/v1/auth/mobile/";
+
+    /**
+     * CSRF is enforced on state-changing requests that may carry the refresh cookie; the mobile
+     * endpoints ignore cookies and only accept a token the caller must already hold.
+     */
     static final RequestMatcher COOKIE_ENDPOINTS = request -> !"GET".equals(request.getMethod())
             && !"HEAD".equals(request.getMethod()) && !"OPTIONS".equals(request.getMethod())
-            && request.getRequestURI().startsWith("/api/v1/auth/");
+            && request.getRequestURI().startsWith("/api/v1/auth/")
+            && !request.getRequestURI().startsWith(MOBILE_AUTH);
 
     @Bean
     @Order(1)
@@ -105,6 +113,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, PUBLIC_AUTH_POSTS).permitAll()
+                        // authenticated by the Stripe signature, not by a user (BillingService)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/billing/stripe/webhook").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/openapi.json", "/api/v1/openapi.json/**",
                                 "/api/v1/docs", "/api/v1/docs/**").permitAll()
                         .anyRequest().authenticated())

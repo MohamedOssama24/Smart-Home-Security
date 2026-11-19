@@ -46,6 +46,7 @@ services:
       SHSC_LOG_LEVEL: ${SHSC_LOG_LEVEL:-INFO}
       SHSC_LOG_FORMAT: ${SHSC_LOG_FORMAT:-ecs}
       SHSC_JWT_PRIVATE_KEY: ${SHSC_JWT_PRIVATE_KEY:?run infrastructure/scripts/generate-jwt-key.sh and set SHSC_JWT_PRIVATE_KEY in .env}
+      SHSC_JOB_SIGNING_KEY: ${SHSC_JOB_SIGNING_KEY:?run infrastructure/scripts/generate-job-signing-key.sh and set SHSC_JOB_SIGNING_KEY in .env}
       SHSC_PUBLIC_BASE_URL: ${SHSC_PUBLIC_BASE_URL:?set SHSC_PUBLIC_BASE_URL in .env}
       SHSC_COOKIE_SECURE: ${SHSC_COOKIE_SECURE:-true}
       SHSC_CORS_ALLOWED_ORIGINS: ${SHSC_CORS_ALLOWED_ORIGINS:-}
@@ -59,6 +60,22 @@ services:
       SHSC_SMTP_PASSWORD: ${SHSC_SMTP_PASSWORD:-}
       SHSC_SMTP_AUTH: ${SHSC_SMTP_AUTH:-false}
       SHSC_SMTP_STARTTLS: ${SHSC_SMTP_STARTTLS:-false}
+      SHSC_NVD_API_KEY: ${SHSC_NVD_API_KEY:-}
+      SHSC_NVD_REQUEST_DELAY: ${SHSC_NVD_REQUEST_DELAY:-PT6S}
+      # push FCM (M14, optional): project id and path of the service-account file inside the container
+      SHSC_FCM_PROJECT_ID: ${SHSC_FCM_PROJECT_ID:-}
+      SHSC_FCM_CREDENTIALS_FILE: ${SHSC_FCM_CREDENTIALS_FILE:-}
+      # security assistant (M16): LOCAL by default, OLLAMA optional (self-hosted)
+      SHSC_ASSISTANT_PROVIDER: ${SHSC_ASSISTANT_PROVIDER:-LOCAL}
+      SHSC_OLLAMA_URL: ${SHSC_OLLAMA_URL:-}
+      SHSC_OLLAMA_MODEL: ${SHSC_OLLAMA_MODEL:-llama3.2}
+      # SaaS subscriptions with Stripe (M17, optional): empty = disabled, test keys only by default
+      SHSC_STRIPE_SECRET_KEY: ${SHSC_STRIPE_SECRET_KEY:-}
+      SHSC_STRIPE_WEBHOOK_SECRET: ${SHSC_STRIPE_WEBHOOK_SECRET:-}
+      SHSC_STRIPE_PRICE_PLUS: ${SHSC_STRIPE_PRICE_PLUS:-}
+      SHSC_STRIPE_PRICE_PRO: ${SHSC_STRIPE_PRICE_PRO:-}
+      SHSC_STRIPE_ALLOW_LIVE: ${SHSC_STRIPE_ALLOW_LIVE:-false}
+      SHSC_STRIPE_TRIAL_DAYS: ${SHSC_STRIPE_TRIAL_DAYS:-0}
     networks: [data, edge]
 
   nginx:

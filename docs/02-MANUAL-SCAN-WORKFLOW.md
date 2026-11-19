@@ -1,5 +1,7 @@
 # 02 — Flusso della scansione manuale
 
+> **Stato (Milestone 6)**: il flusso manuale con il solo profilo `DISCOVERY` (interfacce + ARP) è **implementato**; contratto esatto, codici e limiti in [15-MANUAL-SCANS.md](15-MANUAL-SCANS.md). Gli altri profili e lo scheduler restano progetto.
+
 > Requisito fondamentale MVP: **ogni scansione è avviata manualmente da un utente.** Nessun job periodico di scansione esiste nell'MVP.
 
 ## 1. Sequenza

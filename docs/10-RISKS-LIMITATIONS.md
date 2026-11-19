@@ -7,7 +7,7 @@
 | L2 | Client isolation Wi-Fi / AP isolation | dispositivi invisibili | segnalato in copertura |
 | L3 | MAC randomizzati (iOS/Android/Windows) | identità instabile, niente produttore | correlazione per hostname/mDNS, flag "privato" |
 | L4 | Dispositivi in standby / Wi-Fi power save | non rispondono in quel momento | più tecniche + "ultimo visto"; mai "offline" da un solo metodo |
-| L5 | Zigbee / Z-Wave / BLE / Thread | non sono dispositivi IP | solo via gateway (Home Assistant, Milestone 15) |
+| L5 | Zigbee / Z-Wave / BLE / Thread | non sono dispositivi IP | solo via gateway: inventario Home Assistant (M15, [24-INTEGRATIONS.md](24-INTEGRATIONS.md)), dichiarato e non verificato |
 | L6 | Firmware e modello spesso non esposti | match CVE limitato | finding "potenziali", mai confermati senza versione |
 | L7 | Informazioni auto-dichiarate (SSDP, banner) falsificabili | errori di identificazione | confidenza ≤ MEDIUM, conflitti registrati |
 | L8 | TCP connect scan non distingue alcuni firewall | FILTERED ambiguo | stato esplicito, mai CLOSED da timeout |

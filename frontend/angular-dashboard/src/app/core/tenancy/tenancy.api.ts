@@ -9,6 +9,8 @@ export interface Plan {
   maxUsers: number | null;
   maxCustomers: number | null;
   maxNetworksPerHome: number | null;
+  maxAgentsPerHome: number | null;
+  maxScansPerDay: number | null;
 }
 
 export interface Usage {

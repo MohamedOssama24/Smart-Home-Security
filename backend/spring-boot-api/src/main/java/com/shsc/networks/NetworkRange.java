@@ -77,6 +77,21 @@ public record NetworkRange(InetAddress address, int prefixLength) {
         return address.getAddress().length == 4 ? 4 : 6;
     }
 
+    /**
+     * Whether {@code ip} (numeric literal, never resolved through DNS) belongs to this range.
+     * Returns false for anything that is not a valid literal of the same family.
+     */
+    public boolean contains(String ip) {
+        InetAddress candidate;
+        try {
+            candidate = literal(ip == null ? "" : ip.trim());
+        } catch (ApiException notALiteral) {
+            return false;
+        }
+        byte[] bytes = candidate.getAddress();
+        return bytes.length == address.getAddress().length && samePrefix(bytes, address.getAddress(), prefixLength);
+    }
+
     private static InetAddress literal(String text) {
         try {
             if (IPV4.matcher(text).matches()) {

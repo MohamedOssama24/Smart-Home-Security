@@ -18,9 +18,19 @@ public class AgentRepository {
 
     public enum AgentStatus { ACTIVE, REVOKED }
 
+    /** An agent; capabilities and interfaces are the JSON last reported by its heartbeat. */
     public record Agent(UUID id, UUID homeId, String name, String hostname, String os, String arch,
             String agentVersion, AgentStatus status, Instant enrolledAt, Instant lastSeenAt, Instant revokedAt,
-            String revokeReason) {
+            String revokeReason, Instant lastHeartbeatAt, String capabilitiesJson, String interfacesJson,
+            Integer queueDepth, Long uptimeSeconds, String lastError) {
+    }
+
+    /** Self-diagnosis reported by a heartbeat; interfacesJson null = unchanged since the last one. */
+    public record Heartbeat(String agentVersion, long uptimeSeconds, String interfacesHash, String interfacesJson,
+            String capabilitiesJson, int queueDepth, String lastError) {
+    }
+
+    public record AgentEvent(UUID eventId, String type, Instant occurredAt, Instant receivedAt, String detailJson) {
     }
 
     public record Credential(UUID id, UUID agentId, byte[] publicKey, String status, Instant createdAt) {
@@ -45,7 +55,8 @@ public class AgentRepository {
 
     private static final String AGENT_COLUMNS = """
             id, home_id, name, hostname, os, arch, agent_version, status, enrolled_at, last_seen_at, revoked_at,
-            revoke_reason""";
+            revoke_reason, last_heartbeat_at, capabilities::text AS capabilities, interfaces::text AS interfaces,
+            queue_depth, uptime_seconds, last_error""";
     private static final String TOKEN_COLUMNS =
             "id, home_id, created_by, created_at, expires_at, used_at, used_by_agent_id, revoked_at";
 
@@ -125,6 +136,51 @@ public class AgentRepository {
     public void touch(UUID id, Instant now) {
         jdbc.sql("UPDATE agents SET last_seen_at = :now WHERE id = :id")
                 .param("id", id).param("now", Sql.ts(now)).update();
+    }
+
+    /** Stores a heartbeat. The interface list is replaced only when the agent sent it. */
+    public void recordHeartbeat(UUID id, Heartbeat hb, Instant now) {
+        jdbc.sql("""
+                UPDATE agents SET last_heartbeat_at = :now, last_seen_at = :now, agent_version = :version,
+                    capabilities = CAST(:capabilities AS jsonb),
+                    interfaces = COALESCE(CAST(:interfaces AS jsonb), interfaces),
+                    interfaces_hash = CASE WHEN CAST(:interfaces AS jsonb) IS NULL THEN interfaces_hash ELSE :hash END,
+                    queue_depth = :depth, uptime_seconds = :uptime, last_error = :error
+                WHERE id = :id AND status = 'ACTIVE'""")
+                .param("id", id).param("now", Sql.ts(now)).param("version", hb.agentVersion())
+                .param("capabilities", hb.capabilitiesJson()).param("interfaces", hb.interfacesJson())
+                .param("hash", hb.interfacesHash()).param("depth", hb.queueDepth()).param("uptime", hb.uptimeSeconds())
+                .param("error", hb.lastError()).update();
+    }
+
+    /** Inserts an event unless already received (idempotent); returns true if new. */
+    public boolean insertEvent(UUID tenantId, UUID agentId, UUID eventId, String type, Instant occurredAt,
+            String detailJson, Instant now) {
+        return jdbc.sql("""
+                INSERT INTO agent_events (tenant_id, agent_id, event_id, type, occurred_at, received_at, detail)
+                VALUES (:tenant, :agent, :event, :type, :occurred, :now, CAST(:detail AS jsonb))
+                ON CONFLICT (agent_id, event_id) DO NOTHING""")
+                .param("tenant", tenantId).param("agent", agentId).param("event", eventId).param("type", type)
+                .param("occurred", Sql.ts(occurredAt)).param("now", Sql.ts(now)).param("detail", detailJson)
+                .update() == 1;
+    }
+
+    /** Keeps only the most recent {@code keep} events of the agent. */
+    public void trimEvents(UUID agentId, int keep) {
+        jdbc.sql("""
+                DELETE FROM agent_events WHERE agent_id = :agent AND id NOT IN (
+                    SELECT id FROM agent_events WHERE agent_id = :agent ORDER BY occurred_at DESC, id DESC LIMIT :keep)""")
+                .param("agent", agentId).param("keep", keep).update();
+    }
+
+    public List<AgentEvent> events(UUID agentId, int limit) {
+        return jdbc.sql("""
+                SELECT event_id, type, occurred_at, received_at, detail::text AS detail FROM agent_events
+                WHERE agent_id = :agent ORDER BY occurred_at DESC, id DESC LIMIT :limit""")
+                .param("agent", agentId).param("limit", limit)
+                .query((rs, n) -> new AgentEvent(Sql.uuid(rs, "event_id"), rs.getString("type"),
+                        Sql.instant(rs, "occurred_at"), Sql.instant(rs, "received_at"), rs.getString("detail")))
+                .list();
     }
 
     public void revokeAgent(UUID id, UUID by, String reason, Instant now) {
@@ -212,7 +268,10 @@ public class AgentRepository {
         return new Agent(Sql.uuid(rs, "id"), Sql.uuid(rs, "home_id"), rs.getString("name"), rs.getString("hostname"),
                 rs.getString("os"), rs.getString("arch"), rs.getString("agent_version"),
                 AgentStatus.valueOf(rs.getString("status")), Sql.instant(rs, "enrolled_at"),
-                Sql.instant(rs, "last_seen_at"), Sql.instant(rs, "revoked_at"), rs.getString("revoke_reason"));
+                Sql.instant(rs, "last_seen_at"), Sql.instant(rs, "revoked_at"), rs.getString("revoke_reason"),
+                Sql.instant(rs, "last_heartbeat_at"), rs.getString("capabilities"), rs.getString("interfaces"),
+                rs.getObject("queue_depth", Integer.class), rs.getObject("uptime_seconds", Long.class),
+                rs.getString("last_error"));
     }
 
     private static EnrollmentToken mapToken(ResultSet rs, int row) throws SQLException {

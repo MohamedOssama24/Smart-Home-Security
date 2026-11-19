@@ -9,6 +9,7 @@ import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -19,7 +20,10 @@ public record ShscProperties(
         @NotNull URI publicBaseUrl,
         @Valid @NotNull Mail mail,
         @Valid @NotNull Security security,
-        @Valid @NotNull Agent agent) {
+        @Valid @NotNull Agent agent,
+        @Valid @NotNull Scans scans,
+        @Valid @NotNull Oui oui,
+        @Valid @NotNull Vulnerabilities vulnerabilities) {
 
     public record Mail(@NotBlank String from) {
     }
@@ -62,6 +66,30 @@ public record ShscProperties(
 
     public record Agent(@NotNull Duration enrollmentTokenTtl, @NotNull Duration accessTokenTtl,
             @NotNull Duration assertionMaxLifetime, @NotNull Duration clockSkew,
-            @NotBlank String assertionAudience, @NotBlank String rotationAudience) {
+            @NotBlank String assertionAudience, @NotBlank String rotationAudience,
+            @NotNull Duration heartbeatInterval) {
+    }
+
+    /** Manual scan workflow (docs/02-MANUAL-SCAN-WORKFLOW.md, docs/03-AGENT-PROTOCOL.md §6-§8). */
+    public record Scans(@NotBlank String jobSigningKey, @NotNull Duration queueTtl, @NotNull Duration lease,
+            @NotNull Duration maxDuration, @NotNull Duration lateUploadWindow, @NotNull Duration longPollMax,
+            @NotNull Duration progressInterval) {
+    }
+
+    /**
+     * IEEE registries (MA-L, MA-M, MA-S CSV files), downloaded only when a platform
+     * administrator asks for it (docs/17-DEVICE-FINGERPRINTING.md §2).
+     */
+    public record Oui(@NotEmpty List<URI> sources, @Positive long maxBytes, @NotNull Duration timeout) {
+    }
+
+    /**
+     * Public vulnerability feeds (NVD CVE API 2.0, CISA KEV, FIRST EPSS), downloaded only when a
+     * platform administrator asks for it (docs/19-SECURITY-ANALYSIS.md §2). The NVD API key is
+     * optional (free, raises the rate limit) and never logged.
+     */
+    public record Vulnerabilities(@NotNull URI nvdUrl, @NotNull URI kevUrl, @NotNull URI epssUrl, String nvdApiKey,
+            @NotNull Duration nvdRequestDelay, @Positive long maxBytes, @NotNull Duration timeout,
+            @Positive int maxPagesPerProduct) {
     }
 }

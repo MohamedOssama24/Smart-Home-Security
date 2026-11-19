@@ -3,16 +3,23 @@
     "name": "Smart Home Security Check",
     "language": "Language",
     "navigation": "Main navigation",
-    "languages": { "it": "Italiano", "en": "English" }
+    "languages": {
+      "it": "Italiano",
+      "en": "English"
+    }
   },
   "nav": {
+    "billing": "Subscription",
     "homes": "Homes",
     "customers": "Customers",
     "users": "Users",
     "organization": "Organization",
     "account": "Account",
     "status": "System status",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "overview": "Overview",
+    "menu": "Menu",
+    "alerts": "Alerts"
   },
   "systemStatus": {
     "title": "System status",
@@ -141,7 +148,13 @@
     "cidr": "Range (CIDR)",
     "cidrHint": "Only private IPv4 networks (10.x, 172.16-31.x, 192.168.x, /22 or smaller) or local IPv6 (fc00::/7, fe80::/10, prefix /64 or smaller).",
     "kindLabel": "Type",
-    "kind": { "WIFI": "Wi-Fi", "ETHERNET": "Wired", "VLAN": "VLAN", "GUEST": "Guest", "UNKNOWN": "Not specified" },
+    "kind": {
+      "WIFI": "Wi-Fi",
+      "ETHERNET": "Wired",
+      "VLAN": "VLAN",
+      "GUEST": "Guest",
+      "UNKNOWN": "Not specified"
+    },
     "authorization": "Authorization",
     "authorized": "Authorized",
     "notAuthorized": "Not authorized",
@@ -178,7 +191,9 @@
       "customers": "Customers",
       "networksPerHome": "Networks per home",
       "unlimited": "unlimited",
-      "note": "Limits apply to new creations; disabled users and archived items are not counted."
+      "note": "Limits apply to new creations; disabled users and archived items are not counted.",
+      "agentsPerHome": "Agents per home",
+      "scansPerDay": "Manual scans per home (24 hours)"
     },
     "details": {
       "title": "Organization details",
@@ -240,7 +255,9 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "archive": "Archive",
-    "confirmArchive": "Yes, archive"
+    "confirmArchive": "Yes, archive",
+    "yes": "Yes",
+    "no": "No"
   },
   "agents": {
     "title": "Local agents",
@@ -253,8 +270,16 @@
     "revokeConfirm": "The agent will have to be enrolled again. Continue?",
     "revokeConfirmYes": "Yes, revoke",
     "revokeCancel": "Cancel",
-    "state": { "ACTIVE": "Active", "REVOKED": "Revoked" },
-    "tokenState": { "ACTIVE": "Valid", "USED": "Used", "EXPIRED": "Expired", "REVOKED": "Revoked" },
+    "state": {
+      "ACTIVE": "Active",
+      "REVOKED": "Revoked"
+    },
+    "tokenState": {
+      "ACTIVE": "Valid",
+      "USED": "Used",
+      "EXPIRED": "Expired",
+      "REVOKED": "Revoked"
+    },
     "enroll": {
       "title": "Connect an agent",
       "description": "Generate a one-time code and use it to register the agent installed on a computer of this network. The code expires after 30 minutes.",
@@ -263,10 +288,716 @@
       "command": "Save it to a file (e.g. token.txt) and run on the agent computer:",
       "createdAt": "Created",
       "expiresAt": "Expires",
-      "revoke": "Cancel"
+      "revoke": "Cancel",
+      "service": "Then install it as a service (as administrator):"
+    },
+    "connectivity": {
+      "ONLINE": "Online",
+      "STALE": "Not updated",
+      "OFFLINE": "Offline",
+      "NEVER_CONNECTED": "Never connected",
+      "REVOKED": "Revoked"
+    },
+    "diagnosis": {
+      "show": "Diagnostics",
+      "hide": "Close",
+      "arp": "ARP discovery",
+      "icmp": "Ping (ICMP)",
+      "privileged": "Elevated privileges",
+      "queue": "Queued messages",
+      "router": "Router integrations",
+      "noRouter": "None (configurable on the agent with 'shsc-agent router')",
+      "interfaces": "Network interfaces",
+      "noInterfaces": "No usable network interface.",
+      "noHeartbeat": "The agent has not sent its diagnostics yet. Start it as a service.",
+      "lastError": "Last error",
+      "events": "Recent events",
+      "noEvents": "No events."
+    },
+    "technique": {
+      "raw": "Full (raw sockets)",
+      "unprivileged": "Unprivileged",
+      "os_api": "System API",
+      "os_table": "System table only",
+      "unavailable": "Not available"
+    },
+    "warning": {
+      "ARP_TABLE_ONLY": "The agent only reads the devices already known to the system: some devices may not be found.",
+      "ARP_UNAVAILABLE": "ARP discovery is not available: network coverage will be reduced.",
+      "ICMP_UNAVAILABLE": "Ping (ICMP) is not available: devices that only answer pings will not be found.",
+      "NO_USABLE_INTERFACE": "The agent computer has no active, usable network interface."
+    },
+    "event": {
+      "AGENT_STARTED": "Agent started",
+      "AGENT_STOPPED": "Agent stopped",
+      "CAPABILITIES_CHANGED": "Capabilities changed",
+      "CONNECTION_RESTORED": "Connection restored",
+      "QUEUE_OVERFLOW": "Local queue full: messages lost"
+    }
+  },
+  "scans": {
+    "title": "Scans",
+    "backToHome": "Back to the home",
+    "description": "Start a scan of this home's authorized networks manually. The agent finds which devices are present (ARP, ping, mDNS, SSDP/UPnP, NetBIOS, reverse DNS, IPv6 and, if configured on the agent, the router integrations): no port scan, no credential is tried. Scans never start automatically.",
+    "start": "Start scan",
+    "cancel": "Cancel scan",
+    "cancelRequested": "Cancellation requested…",
+    "devicesFound": "Devices found: {{count}}",
+    "detail": "Result",
+    "history": "History",
+    "empty": "No scans yet.",
+    "show": "Details",
+    "ip": "IP address",
+    "mac": "MAC",
+    "method": "Seen with",
+    "noDevices": "No devices found.",
+    "devicesNote": "Addresses observed in use on the authorized networks: this is not a list of vulnerabilities. Addresses with the same MAC are grouped.",
+    "name": "Name",
+    "declared": "Declared information",
+    "selfDeclared": "Declared by the device, not verified.",
+    "portMappings": "The router declares {{count}} port forwardings to the Internet (UPnP):",
+    "disabled": "disabled",
+    "status": {
+      "PENDING": "Preparing",
+      "QUEUED": "Waiting for the agent",
+      "RUNNING": "Running",
+      "COMPLETED": "Completed",
+      "COMPLETED_WITH_WARNINGS": "Completed with warnings",
+      "FAILED": "Failed",
+      "CANCELLED": "Cancelled"
+    },
+    "reason": {
+      "AGENT_OFFLINE": "The agent was not reachable.",
+      "AGENT_LOST": "The agent stopped responding during the scan.",
+      "TIMEOUT": "The maximum duration was exceeded.",
+      "AGENT_REVOKED": "The agent was revoked.",
+      "AGENT_ABORTED": "The agent aborted the scan.",
+      "USER_CANCELLED": "Cancelled by the user."
+    },
+    "warning": {
+      "TARGET_NOT_CONNECTED": "An authorized network is not directly connected to the agent's computer: it was not scanned.",
+      "IPV6_NOT_SUPPORTED": "IPv6 networks are not scanned yet.",
+      "HOST_LIMIT_REACHED": "The maximum number of addresses per scan was reached: partial results.",
+      "ARP_TABLE_ONLY": "The agent may not send ARP requests: only devices already known to the system were read.",
+      "ARP_UNAVAILABLE": "ARP is not available on this operating system.",
+      "INTERFACE_WITHOUT_ARP": "The network interface does not support ARP.",
+      "ARP_ERROR": "Some ARP requests could not be sent.",
+      "OUT_OF_SCOPE_RESULTS": "Some results outside the authorized networks were discarded.",
+      "LATE_UPLOAD": "The results arrived after the agent had been considered unreachable.",
+      "ICMP_UNAVAILABLE": "Ping (ICMP) is not available: devices that only answer pings were not found.",
+      "MDNS_UNAVAILABLE": "mDNS is not available: the services announced by devices were not read.",
+      "SSDP_UNAVAILABLE": "SSDP/UPnP is not available: UPnP device descriptions were not read.",
+      "NETBIOS_UNAVAILABLE": "NetBIOS is not available: Windows computer names were not read.",
+      "NDP_TABLE_ONLY": "IPv6: only the neighbours already known to the system were read.",
+      "NDP_UNAVAILABLE": "IPv6: discovery is not available on this system.",
+      "ROUTER_OUT_OF_SCOPE": "The router address configured on the agent is not in the authorized networks: it was not contacted.",
+      "ROUTER_AUTH_FAILED": "The router refused the credentials configured on the agent: integration stopped without further attempts.",
+      "ROUTER_UNREACHABLE": "The router did not answer the integration configured on the agent.",
+      "HA_OUT_OF_SCOPE": "Home Assistant is not on an authorized network of the home: it was not contacted.",
+      "HA_UNREACHABLE": "Home Assistant did not answer (network, timeout or invalid HTTPS certificate).",
+      "HA_AUTH_FAILED": "Home Assistant refused the token: create a new long-lived token and configure the agent again.",
+      "HA_INVALID_RESPONSE": "Unexpected answer from Home Assistant: inventory not read.",
+      "HA_PLAIN_HTTP": "Home Assistant is reached over unencrypted HTTP: the token travels in clear text on the local network.",
+      "HA_INVENTORY_TRUNCATED": "Home Assistant has more than 500 devices: inventory truncated.",
+      "PORT_SCAN_HOST_PAUSED": "A device stopped answering during the port check: to avoid overloading it the check was paused, the results are partial.",
+      "PORT_SCAN_OUT_OF_SCOPE": "A device outside the authorized networks connected to the agent was not checked.",
+      "PORT_SCAN_INCOMPLETE": "The port check did not finish (scan cancelled or maximum duration reached): partial results."
+    },
+    "methods": {
+      "ARP": "ARP",
+      "SELF": "Agent's computer",
+      "ICMP": "Ping",
+      "MDNS": "mDNS",
+      "SSDP": "SSDP/UPnP",
+      "UPNP_IGD": "UPnP gateway",
+      "NETBIOS": "NetBIOS",
+      "RDNS": "Reverse DNS",
+      "NDP": "IPv6 (NDP)",
+      "TR064": "Router (TR-064)",
+      "SNMP": "Router (SNMP)",
+      "PORTSCAN": "Ports"
+    },
+    "profile": "Scan type",
+    "profiles": {
+      "DISCOVERY": "Device discovery",
+      "QUICK": "Quick (main ports)",
+      "STANDARD": "Standard (common ports)"
+    },
+    "profileHint": {
+      "DISCOVERY": "Finds the devices connected to the authorized networks, without checking their ports.",
+      "QUICK": "Finds the devices and checks about 40 TCP ports and 6 widespread UDP services. Read-only requests: no login, no password is ever tried.",
+      "STANDARD": "Finds the devices and checks about 300 TCP ports and 8 UDP services. Takes longer; read-only requests, no login, no password is ever tried."
+    },
+    "phase": {
+      "PREPARING": "preparing",
+      "INTERFACES": "network interfaces",
+      "DISCOVERY": "finding devices",
+      "PORTS": "checking ports and services",
+      "UPLOADING": "uploading results"
+    }
+  },
+  "devices": {
+    "title": "Devices",
+    "backToHome": "Back to the home",
+    "devicesLink": "Devices",
+    "description": "Inventory built from the scans. Type, manufacturer and operating system are estimates with a confidence level and the sources they come from: a single weak hint is never enough, in that case the device stays \"unidentified\". You can correct the category by hand: your choice is never overwritten.",
+    "empty": "No devices: start a scan to build the inventory.",
+    "name": "Name",
+    "category": "Category",
+    "ip": "IP",
+    "mac": "MAC",
+    "manufacturer": "Manufacturer",
+    "lastSeen": "Last seen",
+    "show": "Details",
+    "manual": "manual",
+    "randomized": "random MAC",
+    "randomizedNote": "The device uses a random MAC address (privacy): it may change over time and the manufacturer cannot be derived from it.",
+    "probableSameAs": "Probably the same device as \"{{name}}\".",
+    "overall": "Overall confidence",
+    "suggestion": "The latest scans point with good confidence to the category \"{{category}}\": your manual choice stays until you change it.",
+    "setCategory": "Category",
+    "automatic": "Automatic",
+    "identified": "What was identified",
+    "conflict": "sources disagree",
+    "disagrees": "disagrees",
+    "why": "Why this category",
+    "ruleset": "Classification rules version {{version}}.",
+    "history": "Category history",
+    "changeSource": {
+      "AUTO": "Detected",
+      "MANUAL": "Manual"
+    },
+    "confidence": {
+      "LOW": "low",
+      "MEDIUM": "medium",
+      "HIGH": "high"
+    },
+    "strength": {
+      "STRONG": "strong hint",
+      "MODERATE": "moderate hint",
+      "WEAK": "weak hint"
+    },
+    "categories": {
+      "ROUTER": "Router",
+      "IP_CAMERA": "IP camera",
+      "SMART_TV": "Smart TV",
+      "SMARTPHONE": "Smartphone",
+      "TABLET": "Tablet",
+      "LAPTOP": "Laptop",
+      "DESKTOP": "Desktop computer",
+      "PRINTER": "Printer",
+      "NAS": "NAS",
+      "SMART_PLUG": "Smart plug",
+      "SMART_SPEAKER": "Smart speaker",
+      "IOT": "IoT device",
+      "UNKNOWN_DEVICE": "Unidentified"
+    },
+    "fields": {
+      "IP": "IP address",
+      "MAC": "MAC address",
+      "HOSTNAME": "Name",
+      "MANUFACTURER": "Manufacturer",
+      "MODEL": "Model",
+      "OS": "Operating system",
+      "FIRMWARE": "Firmware",
+      "DEVICE_TYPE": "Device type"
+    }
+  },
+  "integrations": {
+    "homeAssistant": "Home Assistant",
+    "instance": "Instance {{ip}}, version {{version}}, {{count}} devices.",
+    "plainHttp": "Unencrypted HTTP: the Home Assistant token travels in clear text on the local network. Configure HTTPS.",
+    "truncated": "Inventory truncated to the first 500 devices.",
+    "model": "Manufacturer and model",
+    "protocolLabel": "Protocol",
+    "matchedIp": "Address in the scan",
+    "note": "Data read from Home Assistant with the owner's token (read-only) and declared by its integrations: not verified by the scan. Zigbee, Z-Wave, Thread and Bluetooth devices have no IP address.",
+    "protocol": {
+      "ZIGBEE": "Zigbee",
+      "ZWAVE": "Z-Wave",
+      "MATTER": "Matter",
+      "THREAD": "Thread",
+      "BLUETOOTH": "Bluetooth",
+      "IP": "IP",
+      "OTHER": "Other"
+    }
+  },
+  "ports": {
+    "title": "Open ports and services",
+    "none": "No open port among those checked.",
+    "notScanned": "The ports of this device have not been checked yet: start a Quick or Standard scan.",
+    "ip": "Address",
+    "port": "Port",
+    "service": "Service",
+    "product": "Product / version",
+    "details": "Details",
+    "status": {
+      "PROBABLE": "probable",
+      "CONFIRMED": "confirmed"
+    },
+    "evidence": {
+      "title": "Page title: {{value}}",
+      "server": "Declared server: {{value}}",
+      "dialect": "SMB version: {{value}}",
+      "authRequired": "Requires authentication",
+      "loginForm": "Login page",
+      "redirectsToHttps": "Redirects to HTTPS",
+      "smb1": "Accepts SMB1 (obsolete protocol)",
+      "signingNotRequired": "SMB signing not required",
+      "tlsVersions": "TLS versions: {{value}}",
+      "tlsExpired": "Expired certificate",
+      "tlsSelfSigned": "Self-signed certificate"
+    },
+    "declaredNote": "\"Probable\": service inferred from the port number. \"Confirmed\": the device answered the protocol. Product, version and titles are declared by the device and not verified.",
+    "summary": "ports checked: {{tcp}} TCP and {{udp}} UDP · open {{open}} · closed {{closed}} · no answer {{silent}}",
+    "protocols": "Detected protocols"
+  },
+  "overview": {
+    "title": "Overview",
+    "description": "The security status of your homes, riskiest first. The score is the one of the last Quick or Standard scan.",
+    "noHomes": "No homes.",
+    "toHomes": "Add a home",
+    "summary": {
+      "homes": "homes",
+      "atRisk": "at high or critical risk",
+      "critical": "critical or high findings",
+      "kev": "actively exploited vulnerabilities",
+      "unscored": "without a score"
+    },
+    "provisional": "Provisional (low coverage)",
+    "noScore": "No score: run a Quick or Standard scan.",
+    "notComputed": "The last scan (Discovery only) did not update the score.",
+    "noFindings": "No open findings",
+    "devices": "{{count}} devices",
+    "lastScan": "Last scan",
+    "neverScanned": "Never scanned",
+    "restricted": "You are not allowed to see the security status of this home."
+  },
+  "vulnerabilities": {
+    "title": "Known vulnerabilities (CVE)",
+    "description": "The CVEs the security analysis matched to the devices of the home, actively exploited ones (KEV) first, then by CVSS score.",
+    "none": "No known vulnerability matched to the devices.",
+    "kevOnly": "Actively exploited only (KEV)",
+    "count": "{{shown}} of {{total}}",
+    "product": "Product",
+    "device": "Device",
+    "match": "Match",
+    "limit": "At most 500 CVEs of non-resolved findings are listed. The link opens the CVE page on the NVD website."
+  },
+  "networkMap": {
+    "title": "Network map",
+    "description": "The devices of each authorized network around the router, colored by the points they take off the last score. Select a device for its details.",
+    "noDevices": "No devices: run a scan.",
+    "noRisk": "No score computed: risk colors are not available.",
+    "legend": {
+      "none": "no points taken off",
+      "low": "few points taken off",
+      "high": "many points taken off (15 or more)",
+      "exposed": "exposed to the Internet (UPnP mapping)",
+      "score": "Score {{score}}"
+    },
+    "otherDevices": "Devices outside the configured networks",
+    "routerUnknown": "Router not identified",
+    "category": "Category",
+    "manufacturer": "Manufacturer",
+    "points": "Points taken off",
+    "findings": "Counted findings",
+    "lastSeen": "Last seen",
+    "tableTitle": "Device list",
+    "device": "Device",
+    "network": "Network",
+    "logicalNote": "Logical map: the links show the network a device belongs to, not the real cabling or Wi-Fi, which cannot be observed from the local network."
+  },
+  "alerts": {
+    "title": "Alerts",
+    "description": "What changed in your homes: new serious issues, resolved issues, score drops, new devices, failed scans and unreachable agents. The same event repeated stays a single alert with the number of times.",
+    "unreadOnly": "Unread only",
+    "unread": "unread alerts",
+    "readAll": "Mark all as read",
+    "markRead": "Mark as read",
+    "open": "Open",
+    "none": "No alerts.",
+    "resolved": "Resolved",
+    "occurrences": "Repeated {{count}} times",
+    "severity": {
+      "INFO": "Info",
+      "LOW": "Low",
+      "MEDIUM": "Medium",
+      "HIGH": "High",
+      "CRITICAL": "Critical"
+    },
+    "channel": {
+      "DASHBOARD": "Dashboard",
+      "EMAIL": "E-mail"
+    },
+    "type": {
+      "NEW_FINDING": "New serious issue (high or critical)",
+      "FINDING_RESOLVED": "Issue resolved",
+      "SCORE_DROPPED": "Security score drop",
+      "NEW_DEVICE": "New device on the network",
+      "SCAN_FAILED": "Scan failed",
+      "AGENT_OFFLINE": "Agent unreachable"
+    },
+    "text": {
+      "NEW_FINDING": "New issue: {{title}}",
+      "FINDING_RESOLVED": "Issue resolved: {{title}}",
+      "SCORE_DROPPED": "The score dropped to {{score}}/100 ({{change}} points)",
+      "NEW_DEVICE": "New device on the network: {{name}}",
+      "NEW_DEVICES": "{{count}} new devices on the network",
+      "SCAN_FAILED": "Scan failed ({{reason}})",
+      "AGENT_OFFLINE": "Agent \"{{name}}\" unreachable for more than 15 minutes"
+    },
+    "preferences": {
+      "title": "Notification preferences",
+      "description": "Choose which alerts you receive on the dashboard and by e-mail, and from which severity.",
+      "type": "Alert",
+      "enabled": "On",
+      "minSeverity": "Minimum severity",
+      "note": "E-mails go to the address of your account. A repeated alert sends no more e-mails until it is resolved. You only receive the alerts of the homes you can see.",
+      "saved": "Preferences saved."
+    }
+  },
+  "billing": {
+    "title": "Subscription",
+    "currentPlan": "Current plan:",
+    "renewsOn": "renews on",
+    "endsOn": "ends on",
+    "trialEndsOn": "free trial until",
+    "trialOffer": "{{days}}-day free trial: you are charged when the trial ends, cancel before then to pay nothing.",
+    "disabled": "Online subscriptions are not enabled on this installation.",
+    "subscribe": "Subscribe",
+    "portal": "Manage subscription and invoices",
+    "note": "Payment happens on Stripe: card data never passes through this dashboard. The plan is updated as soon as Stripe confirms the payment. A downgrade deletes no data, but no new resources can be created beyond the limits.",
+    "checkoutSuccess": "Thank you! The plan will be updated as soon as Stripe confirms the payment (usually a few seconds).",
+    "checkoutCancel": "Payment cancelled: the plan has not changed.",
+    "plans": { "FREE": "Free", "PLUS": "Plus", "PRO": "Pro" },
+    "limits": {
+      "homes": "Homes",
+      "users": "Users",
+      "customers": "Customers",
+      "agents": "Agents per home",
+      "scans": "Scans per day per home",
+      "whiteLabel": "White label (name, color and logo, also in PDF reports)"
+    },
+    "status": {
+      "incomplete": "payment incomplete",
+      "incomplete_expired": "payment expired",
+      "trialing": "trial",
+      "active": "active",
+      "past_due": "payment past due",
+      "canceled": "canceled",
+      "unpaid": "unpaid",
+      "paused": "paused"
+    }
+  },
+  "branding": {
+    "title": "White label",
+    "unavailable": "White label is included in the Pro plan.",
+    "displayName": "Display name",
+    "primaryColor": "Primary color",
+    "supportEmail": "Support e-mail",
+    "save": "Save",
+    "saved": "Branding saved.",
+    "logo": "Logo",
+    "logoHint": "PNG or JPEG, at most 256 KB and 2048×2048 pixels.",
+    "removeLogo": "Remove logo"
+  },
+  "assistant": {
+    "title": "Security assistant",
+    "disclaimer": "It answers only with the data of this home (score, issues, devices) and cites them. It performs no action and invents nothing: if the data is missing it says so. Questions and answers are not saved.",
+    "question": "Your question",
+    "placeholder": "For example: what should I fix first?",
+    "ask": "Ask",
+    "sources": "Sources:",
+    "kind": {
+      "SCORE": "score",
+      "FINDING": "issue",
+      "DEVICE": "device"
+    },
+    "provider": "Answered by: {{provider}}",
+    "fallback": {
+      "NOT_GROUNDED": "the AI answer was not supported by the data: the standard answer is shown",
+      "PROVIDER_UNAVAILABLE": "AI service unavailable: the standard answer is shown"
+    },
+    "dataAsOf": "data of",
+    "suggest": {
+      "risk": "What is my risk score?",
+      "fix": "What should I fix first?",
+      "devices": "Which devices do I have?"
+    }
+  },
+  "reports": {
+    "title": "PDF reports",
+    "description": "A PDF report, readable also by non-technical people, with score, coverage, issues to fix, devices found and limits of the analysis.",
+    "scan": "Scan",
+    "language": "Language",
+    "generate": "Generate report",
+    "noScans": "No completed scan: run a scan to generate a report.",
+    "none": "No report generated yet.",
+    "requestedAt": "Requested on",
+    "statusLabel": "Status",
+    "status": {
+      "PENDING": "Being prepared",
+      "READY": "Ready",
+      "FAILED": "Failed"
+    },
+    "size": "{{pages}} pages, {{kb}} KB",
+    "download": "Download PDF"
+  },
+  "risk": {
+    "title": "Security score",
+    "description": "From 0 to 100 (100 = no known problem). The score depends on what the scans could check: that is why it is always shown with the coverage.",
+    "backToHome": "Back to the home",
+    "noScan": "No score yet: run a Quick or Standard scan.",
+    "notComputed": {
+      "PORT_SCAN_REQUIRED": "The last scan (Discovery only) does not check ports and services: no score was computed. Run a Quick scan or higher."
+    },
+    "showingLast": "The last computed score is shown below.",
+    "computedAt": "Computed on",
+    "profile": "Scan",
+    "trigger": {
+      "SCAN": "After a scan",
+      "TRIAGE": "After a finding was managed"
+    },
+    "level": {
+      "LOW": "Low risk",
+      "MEDIUM": "Medium risk",
+      "HIGH": "High risk",
+      "CRITICAL": "Critical risk"
+    },
+    "rating": {
+      "EXCELLENT": "Excellent",
+      "GOOD": "Good",
+      "FAIR": "Fair",
+      "POOR": "Poor",
+      "CRITICAL": "Critical"
+    },
+    "provisional": "Provisional score: the scan checked little of the network, so the score is capped at {{cap}} (it would be {{uncapped}} otherwise). Finding no problem does not mean there is none.",
+    "delta": {
+      "change": "{{change}} points from the previous score ({{previous}}).",
+      "title": "What changed",
+      "none": "No change in the counted findings.",
+      "new": "New counted findings ({{count}})",
+      "removed": "Findings no longer counted ({{count}})",
+      "devices": "New devices ({{count}})",
+      "status": {
+        "RESOLVED": "resolved (no longer detected)",
+        "FALSE_POSITIVE": "marked as false positive",
+        "ACCEPTED_RISK": "accepted risk",
+        "OPEN": "open",
+        "ACKNOWLEDGED": "acknowledged",
+        "REMOVED": "device removed"
+      }
+    },
+    "coverage": {
+      "title": "Coverage",
+      "description": "How much of the network the scan could check: analyzed devices, profile, discovery techniques that worked and router integration.",
+      "hosts": "Analyzed devices: {{analyzed}} of {{discovered}}",
+      "depth": "Profile: {{profile}}",
+      "techniques": "Discovery techniques",
+      "routerYes": "Router integration: available",
+      "routerNo": "Router integration: not configured",
+      "hint": "Below 80% coverage the judgement cannot be \"Excellent\": a Standard scan and the router integration increase it."
+    },
+    "why": {
+      "title": "Why this score?",
+      "formula": "Each finding takes points off: severity × type × confidence × device importance × Internet exposure × active exploitation (KEV). A single device takes off at most 45 points.",
+      "none": "No counted finding.",
+      "finding": "Finding",
+      "device": "Device",
+      "factors": "Factors",
+      "points": "Points",
+      "more": "{{count}} more findings not shown.",
+      "capped": "For at least one device the points taken off were capped at {{cap}}.",
+      "notScored": "{{count}} items to check take no points off."
+    },
+    "excluded": {
+      "title": "Excluded from the score (false positives and accepted risks)"
+    },
+    "toFindings": "Go to the security findings",
+    "topDevices": "Riskiest devices",
+    "exposed": "Exposed to the Internet",
+    "cappedDevice": "{{raw}} points before the cap",
+    "history": {
+      "title": "History",
+      "date": "Date",
+      "score": "Score",
+      "change": "Change",
+      "cause": "Cause",
+      "provisionalNote": "* provisional score (low coverage)."
+    }
+  },
+  "findings": {
+    "title": "Security findings",
+    "description": "What the scans of the authorized networks found. A confirmed vulnerability is not a potential risk: each item tells how certain it is and which data it comes from.",
+    "backToHome": "Back to the home",
+    "empty": "No findings with the selected filters.",
+    "finding": "Finding",
+    "device": "Device",
+    "severityLabel": "Severity",
+    "statusLabel": "Status",
+    "confidenceLabel": "Confidence",
+    "firstDetected": "First detected",
+    "lastDetected": "Last detected",
+    "resolvedAt": "Resolved on",
+    "reason": "Reason",
+    "show": "Details",
+    "whatItMeans": "What it means",
+    "whatToDo": "What to do",
+    "evidence": "Evidence",
+    "cves": "Known vulnerabilities (CVE)",
+    "cveNote": "Matched to the product and version declared by the service, not verified. Descriptions from the NVD.",
+    "moreCves": "{{count}} more CVEs not shown.",
+    "kev": "Actively exploited",
+    "epss": "Exploitation probability (EPSS): {{value}}",
+    "filter": {
+      "status": "Status",
+      "severity": "Severity",
+      "type": "Type",
+      "all": "All"
+    },
+    "severity": {
+      "CRITICAL": "Critical",
+      "HIGH": "High",
+      "MEDIUM": "Medium",
+      "LOW": "Low",
+      "INFORMATIONAL": "Informational"
+    },
+    "status": {
+      "OPEN": "Open",
+      "ACKNOWLEDGED": "Acknowledged",
+      "RESOLVED": "Resolved",
+      "FALSE_POSITIVE": "False positive",
+      "ACCEPTED_RISK": "Accepted risk"
+    },
+    "confidence": {
+      "HIGH": "high",
+      "MEDIUM": "medium",
+      "LOW": "low"
+    },
+    "type": {
+      "CONFIRMED_VULNERABILITY": {
+        "label": "Confirmed vulnerability",
+        "explanation": "The version was read from the protocol itself and exactly matches a known vulnerability."
+      },
+      "POTENTIAL_RISK": {
+        "label": "Potential risk",
+        "explanation": "The collected data points to a possible risk that could not be confirmed (declared version, version range or conditions to check)."
+      },
+      "SUSPICIOUS_CONFIGURATION": {
+        "label": "Suspicious configuration",
+        "explanation": "The device answered with a configuration considered unsafe."
+      },
+      "UNVERIFIED_INFORMATION": {
+        "label": "Information to check",
+        "explanation": "Useful information to check, not necessarily a problem."
+      }
+    },
+    "match": {
+      "EXACT_VERSION": "exact version",
+      "VERSION_RANGE": "version range",
+      "PRODUCT_ONLY": "product only (unknown version)"
+    },
+    "triage": {
+      "title": "Manage",
+      "status": "New status",
+      "reason": "Reason",
+      "note": "A reason is required (except to reopen) and is recorded. \"Resolved\" is set only by a later scan.",
+      "save": "Save"
+    },
+    "rule": {
+      "telnet-open": {
+        "title": "Telnet enabled on port {{port}}",
+        "description": "Telnet sends passwords and commands in clear text: anyone on the same network can read them. It is also a common target of IoT malware.",
+        "recommendation": "Disable Telnet in the device settings and use SSH or the official app. If that is not possible, update the firmware or consider replacing the device."
+      },
+      "ftp-cleartext": {
+        "title": "Unencrypted FTP on port {{port}}",
+        "description": "FTP sends credentials and files in clear text over the network.",
+        "recommendation": "Disable FTP or use SFTP / FTPS; turn the service off if it is not needed."
+      },
+      "http-login-cleartext": {
+        "title": "Login page without HTTPS on port {{port}}",
+        "description": "Credentials typed in this page travel in clear text on the local network.",
+        "recommendation": "Enable HTTPS in the device settings if available and use a unique password."
+      },
+      "tls-legacy-protocol": {
+        "title": "Outdated TLS protocols on port {{port}} ({{versions}})",
+        "description": "TLS 1.0 and 1.1 are deprecated and have known weaknesses.",
+        "recommendation": "Update the firmware or disable TLS 1.0/1.1 in the settings, keeping TLS 1.2 or 1.3."
+      },
+      "tls-certificate-expired": {
+        "title": "Expired certificate on port {{port}}",
+        "description": "The certificate presented by the device has expired: browsers show warnings and an attack becomes hard to notice.",
+        "recommendation": "Renew or regenerate the certificate in the device settings or update the firmware."
+      },
+      "smb-v1-enabled": {
+        "title": "SMB1 enabled on port {{port}}",
+        "description": "SMB1 is an obsolete protocol exploited by well-known malware (e.g. ransomware).",
+        "recommendation": "Disable SMB1 and use SMB2 or SMB3."
+      },
+      "upnp-exposed-mapping": {
+        "title": "Port {{externalPort}} opened to the Internet via UPnP",
+        "description": "The router declares an automatic forwarding (UPnP) that makes port {{internalPort}} of the device reachable from the Internet.",
+        "recommendation": "Remove the forwarding from the router, disable UPnP if not needed and use the vendor's official remote access."
+      },
+      "upnp-igd-enabled": {
+        "title": "UPnP enabled on the router",
+        "description": "Any device of the network can open ports to the Internet without asking.",
+        "recommendation": "Unless game consoles or apps need it, disable UPnP in the router settings."
+      },
+      "tr069-exposed": {
+        "title": "TR-069 remote management port ({{port}}) reachable",
+        "description": "TR-069 is used by the provider to manage the router remotely. It is usually normal, but worth knowing.",
+        "recommendation": "Check with the provider that the router firmware is up to date."
+      },
+      "rtsp-open": {
+        "title": "RTSP video stream on port {{port}}",
+        "description": "The device offers an RTSP video stream on the local network. Only a check (OPTIONS) was sent: no video was opened.",
+        "recommendation": "Make sure the stream requires a strong password; disable it if you do not use it."
+      },
+      "mqtt-cleartext": {
+        "title": "Unencrypted MQTT on port {{port}}",
+        "description": "MQTT messages and any credentials travel in clear text.",
+        "recommendation": "Use MQTT over TLS (port 8883) and require authentication."
+      },
+      "snmp-enabled": {
+        "title": "SNMP enabled on port {{port}}",
+        "description": "SNMP can expose information about the device; no community was tried.",
+        "recommendation": "Disable SNMP if not needed; otherwise use SNMPv3 with authentication."
+      },
+      "dns-open-resolver": {
+        "title": "Recursive DNS server on port {{port}}",
+        "description": "A device other than the router resolves names for anyone who asks: it can be misused.",
+        "recommendation": "Check whether the DNS service is intended; disable it if not needed."
+      },
+      "device-unknown": {
+        "title": "Unidentified device",
+        "description": "It was not possible to tell what kind of device this is.",
+        "recommendation": "Check what it is and set its category in the devices page; if you do not recognize it, consider changing the Wi-Fi password."
+      },
+      "cve-version-match": {
+        "title": "{{cve}} in {{product}} {{version}}",
+        "description": "The version declared by the service falls within a known vulnerability.",
+        "recommendation": "Update the device firmware or software to the latest available version; if there is no update, restrict access to the service."
+      },
+      "cve-product-only": {
+        "title": "Known vulnerabilities for {{product}} (version not determined)",
+        "description": "There are {{cves}} known vulnerabilities for this product, but its version is unknown: it is not possible to tell whether the device is affected.",
+        "recommendation": "Check the installed version in the device settings and update it if needed."
+      }
     }
   },
   "errors": {
+    "PLAN_NOT_AVAILABLE": "This plan is not available for your account.",
+    "SUBSCRIPTION_EXISTS": "You already have a subscription: change it from \"Manage subscription\".",
+    "NO_SUBSCRIPTION": "You do not have a subscription yet.",
+    "BILLING_DISABLED": "Online subscriptions are not enabled.",
+    "BILLING_PROVIDER_ERROR": "The payment service is not reachable. Try again later.",
+    "PLAN_FEATURE_UNAVAILABLE": "This feature is not included in your plan.",
+    "INVALID_LOGO": "The logo must be a PNG or JPEG of at most 256 KB and 2048×2048 pixels.",
+    "INVALID_COLOR": "Invalid color.",
+    "INVALID_NAME": "Invalid name.",
     "GENERIC": "Something went wrong. Please try again.",
     "NETWORK": "The service is unreachable. Check your connection.",
     "INVALID_CREDENTIALS": "E-mail or password is not correct.",
@@ -306,6 +1037,17 @@
     "INVALID_SCOPE": "Invalid scope for this role.",
     "ROLE_ALREADY_ASSIGNED": "The user already has this role.",
     "INVALID_STATUS": "Invalid status.",
-    "UNKNOWN_ROLE": "Unknown role."
+    "UNKNOWN_ROLE": "Unknown role.",
+    "NO_AUTHORIZED_NETWORK": "Authorize at least one network of the home before starting a scan.",
+    "AGENT_OFFLINE": "No agent of this home is online: start the agent and try again.",
+    "SCAN_ALREADY_ACTIVE": "A scan is already running for this home.",
+    "SCAN_ALREADY_FINISHED": "The scan has already finished.",
+    "SCAN_CHANGED": "The scan was updated in the meantime: try again.",
+    "INVALID_SCAN_TRANSITION": "Not possible in the current state of the scan.",
+    "INVALID_CATEGORY": "Invalid category.",
+    "INVALID_FILTER": "Invalid filter.",
+    "REASON_REQUIRED": "Please give a reason.",
+    "INVALID_REASON": "The reason is too long (500 characters at most).",
+    "FINDING_RESOLVED": "The finding is already resolved: it reopens by itself if a scan detects it again."
   }
 }

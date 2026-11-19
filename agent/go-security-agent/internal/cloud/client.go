@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"shsc/agent/internal/buildinfo"
+	"shsc/agent/internal/capabilities"
 )
 
 const maxResponseBytes = 1 << 20
@@ -96,6 +97,8 @@ type EnrollResponse struct {
 	AgentID      string `json:"agentId"`
 	HomeID       string `json:"homeId"`
 	CredentialID string `json:"credentialId"`
+	// JobSigningKey is the backend public key (raw Ed25519, base64url) that signs scan jobs.
+	JobSigningKey string `json:"jobSigningKey"`
 }
 
 // TokenResponse is a short-lived agent access token.
@@ -113,11 +116,64 @@ type SessionResponse struct {
 	HomeName       string    `json:"homeName"`
 	CredentialID   string    `json:"credentialId"`
 	TokenExpiresAt time.Time `json:"tokenExpiresAt"`
+	JobSigningKey  string    `json:"jobSigningKey"`
 }
 
 // RotateResponse returns the id of the new credential.
 type RotateResponse struct {
 	CredentialID string `json:"credentialId"`
+}
+
+// SchemaVersion of the agent messages (the backend accepts N and N-1).
+const SchemaVersion = 1
+
+// HeartbeatRequest reports liveness and self-diagnosis. Interfaces is nil (JSON null) when
+// the list did not change since the last accepted heartbeat: only its hash is sent.
+type HeartbeatRequest struct {
+	SchemaVersion  int                      `json:"schemaVersion"`
+	AgentVersion   string                   `json:"agentVersion"`
+	UptimeSeconds  int64                    `json:"uptimeSeconds"`
+	InterfacesHash string                   `json:"interfacesHash"`
+	Interfaces     []capabilities.Interface `json:"interfaces"`
+	Capabilities   capabilities.Report      `json:"capabilities"`
+	QueueDepth     int                      `json:"queueDepth"`
+	LastError      string                   `json:"lastError,omitempty"`
+}
+
+// HeartbeatResponse carries the server clock and the heartbeat interval to use.
+type HeartbeatResponse struct {
+	ServerTime               time.Time `json:"serverTime"`
+	HeartbeatIntervalSeconds int       `json:"heartbeatIntervalSeconds"`
+}
+
+// Event is a local agent event delivered through the persistent queue. ID is chosen by the
+// agent, so a re-sent event is recognised as a duplicate by the backend.
+type Event struct {
+	ID         string         `json:"id"`
+	Type       string         `json:"type"`
+	OccurredAt time.Time      `json:"occurredAt"`
+	Detail     map[string]any `json:"detail,omitempty"`
+}
+
+// EventsResponse counts new and already known events.
+type EventsResponse struct {
+	Accepted   int `json:"accepted"`
+	Duplicates int `json:"duplicates"`
+}
+
+// Heartbeat sends the periodic liveness report.
+func (c *Client) Heartbeat(ctx context.Context, accessToken string, req HeartbeatRequest) (HeartbeatResponse, error) {
+	var out HeartbeatResponse
+	err := c.do(ctx, http.MethodPost, "/api/v1/agent/heartbeat", accessToken, req, &out)
+	return out, err
+}
+
+// Events delivers a batch of queued events (idempotent).
+func (c *Client) Events(ctx context.Context, accessToken string, events []Event) (EventsResponse, error) {
+	var out EventsResponse
+	err := c.do(ctx, http.MethodPost, "/api/v1/agent/events", accessToken,
+		map[string]any{"schemaVersion": SchemaVersion, "events": events}, &out)
+	return out, err
 }
 
 // Enroll registers the agent with a one-time enrollment token.

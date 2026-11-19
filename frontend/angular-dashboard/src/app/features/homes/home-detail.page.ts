@@ -9,6 +9,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import {
   ATTESTATION_VERSION,
   Agent,
+  AgentEvent,
   CreatedEnrollmentToken,
   EnrollmentToken,
   Home,
@@ -34,6 +35,20 @@ import {
           <p class="muted">{{ h.address }}</p>
         }
         <p class="muted">{{ 'homes.fields.timezone' | transloco }}: {{ h.timezone }}</p>
+        @if (canReadScans()) {
+          <p><a [routerLink]="['/homes', h.id, 'scans']" data-testid="scans-link">{{ 'scans.title' | transloco }} →</a></p>
+        }
+        @if (canReadDevices()) {
+          <p><a [routerLink]="['/homes', h.id, 'devices']" data-testid="devices-link">{{ 'devices.title' | transloco }} →</a></p>
+          <p><a [routerLink]="['/homes', h.id, 'network-map']" data-testid="network-map-link">{{ 'networkMap.title' | transloco }} →</a></p>
+        }
+        @if (canReadFindings()) {
+          <p><a [routerLink]="['/homes', h.id, 'findings']" data-testid="findings-link">{{ 'findings.title' | transloco }} →</a></p>
+          <p><a [routerLink]="['/homes', h.id, 'risk']" data-testid="risk-link">{{ 'risk.title' | transloco }} →</a></p>
+          <p><a [routerLink]="['/homes', h.id, 'vulnerabilities']" data-testid="vulnerabilities-link">{{ 'vulnerabilities.title' | transloco }} →</a></p>
+          <p><a [routerLink]="['/homes', h.id, 'reports']" data-testid="reports-link">{{ 'reports.title' | transloco }} →</a></p>
+          <p><a [routerLink]="['/homes', h.id, 'assistant']" data-testid="assistant-link">{{ 'assistant.title' | transloco }} →</a></p>
+        }
         @if (canWrite()) {
           @if (editing()) {
             <form [formGroup]="homeForm" (ngSubmit)="saveHome(h)" novalidate data-testid="home-form">
@@ -214,13 +229,20 @@ import {
                 <tr>
                   <td>{{ agent.name }}<br /><span class="muted">{{ agent.hostname }}</span></td>
                   <td>{{ agent.os }}/{{ agent.arch }} · {{ agent.agentVersion }}</td>
-                  <td>{{ agent.lastSeenAt | appDate: 'short' }}</td>
+                  <td>{{ agent.lastHeartbeatAt ?? agent.lastSeenAt | appDate: 'short' }}</td>
                   <td>
-                    <span class="badge" [class.ok]="agent.status === 'ACTIVE'" [class.err]="agent.status === 'REVOKED'">
-                      {{ 'agents.state.' + agent.status | transloco }}
+                    <span class="badge" data-testid="connectivity"
+                          [class.ok]="agent.connectivity === 'ONLINE'"
+                          [class.warn]="agent.connectivity === 'STALE'"
+                          [class.err]="agent.connectivity === 'OFFLINE' || agent.connectivity === 'REVOKED'">
+                      {{ 'agents.connectivity.' + agent.connectivity | transloco }}
                     </span>
                   </td>
                   <td>
+                    <button type="button" (click)="toggleDiagnosis(agent)" [attr.aria-expanded]="expanded() === agent.id"
+                            data-testid="diagnosis-toggle">
+                      {{ (expanded() === agent.id ? 'agents.diagnosis.hide' : 'agents.diagnosis.show') | transloco }}
+                    </button>
                     @if (agent.status === 'ACTIVE' && canRevoke()) {
                       @if (confirmingRevoke() === agent.id) {
                         <!-- revocation cannot be undone: the agent must be enrolled again -->
@@ -243,6 +265,54 @@ import {
                     }
                   </td>
                 </tr>
+                @if (expanded() === agent.id) {
+                  <tr>
+                    <td colspan="5" data-testid="diagnosis">
+                      @if (agent.capabilities; as caps) {
+                        <dl class="facts">
+                          <dt>{{ 'agents.diagnosis.arp' | transloco }}</dt>
+                          <dd>{{ 'agents.technique.' + caps.arp | transloco }}</dd>
+                          <dt>{{ 'agents.diagnosis.icmp' | transloco }}</dt>
+                          <dd>{{ 'agents.technique.' + caps.icmp | transloco }}</dd>
+                          <dt>{{ 'agents.diagnosis.privileged' | transloco }}</dt>
+                          <dd>{{ (caps.privileged ? 'common.yes' : 'common.no') | transloco }}</dd>
+                          <dt>{{ 'agents.diagnosis.queue' | transloco }}</dt>
+                          <dd>{{ agent.queueDepth ?? 0 }}</dd>
+                          <dt>{{ 'agents.diagnosis.router' | transloco }}</dt>
+                          <dd>{{ caps.routerIntegrations?.length ? caps.routerIntegrations!.join(', ') : ('agents.diagnosis.noRouter' | transloco) }}</dd>
+                        </dl>
+                        @for (warning of caps.warnings; track warning) {
+                          <div class="alert warning" role="status">{{ 'agents.warning.' + warning | transloco }}</div>
+                        }
+                        <h3>{{ 'agents.diagnosis.interfaces' | transloco }}</h3>
+                        @if (agent.interfaces?.length) {
+                          <ul>
+                            @for (iface of agent.interfaces; track iface.name) {
+                              <li><strong>{{ iface.name }}</strong> {{ iface.addresses.join(', ') }}</li>
+                            }
+                          </ul>
+                        } @else {
+                          <p class="muted">{{ 'agents.diagnosis.noInterfaces' | transloco }}</p>
+                        }
+                      } @else {
+                        <p class="muted">{{ 'agents.diagnosis.noHeartbeat' | transloco }}</p>
+                      }
+                      @if (agent.lastError) {
+                        <p class="muted">{{ 'agents.diagnosis.lastError' | transloco }}: <code>{{ agent.lastError }}</code></p>
+                      }
+                      <h3>{{ 'agents.diagnosis.events' | transloco }}</h3>
+                      @if (events().length) {
+                        <ul data-testid="agent-events">
+                          @for (event of events(); track event.id) {
+                            <li>{{ event.occurredAt | appDate: 'short' }} · {{ 'agents.event.' + event.type | transloco }}</li>
+                          }
+                        </ul>
+                      } @else {
+                        <p class="muted">{{ 'agents.diagnosis.noEvents' | transloco }}</p>
+                      }
+                    </td>
+                  </tr>
+                }
               }
             </tbody>
           </table>
@@ -259,6 +329,8 @@ import {
               <code class="secret">{{ c.token }}</code>
               <span class="muted">{{ 'agents.enroll.command' | transloco }}</span>
               <code class="secret">shsc-agent enroll --api {{ origin }} --token-file token.txt</code>
+              <span class="muted">{{ 'agents.enroll.service' | transloco }}</span>
+              <code class="secret">shsc-agent service install</code>
             </div>
           }
           <button type="button" class="primary" (click)="createToken()" [disabled]="busy()">
@@ -313,6 +385,9 @@ export class HomeDetailPage implements OnInit {
   readonly busy = signal(false);
   /** Agent whose revocation is waiting for the second click. */
   readonly confirmingRevoke = signal<string | null>(null);
+  /** Agent whose self-diagnosis is shown, with its recent events. */
+  readonly expanded = signal<string | null>(null);
+  readonly events = signal<AgentEvent[]>([]);
   readonly problem = signal<ApiProblem | null>(null);
 
   readonly networks = signal<Network[]>([]);
@@ -349,6 +424,18 @@ export class HomeDetailPage implements OnInit {
   /** UI hints only: the backend checks the permission on this home. */
   canWrite(): boolean {
     return this.auth.hasPermission('home:write');
+  }
+
+  canReadScans(): boolean {
+    return this.auth.hasPermission('scan:read');
+  }
+
+  canReadDevices(): boolean {
+    return this.auth.hasPermission('device:read');
+  }
+
+  canReadFindings(): boolean {
+    return this.auth.hasPermission('finding:read');
   }
 
   canManageNetworks(): boolean {
@@ -482,6 +569,19 @@ export class HomeDetailPage implements OnInit {
       await firstValueFrom(this.api.revokeAgent(agent.id, 'revoked from dashboard'));
       this.confirmingRevoke.set(null);
       this.agents.set(await firstValueFrom(this.api.agents(this.id())));
+    });
+  }
+
+  /** Shows or hides the self-diagnosis of an agent; its recent events are loaded on opening. */
+  async toggleDiagnosis(agent: Agent): Promise<void> {
+    if (this.expanded() === agent.id) {
+      this.expanded.set(null);
+      return;
+    }
+    this.expanded.set(agent.id);
+    this.events.set([]);
+    await this.run(async () => {
+      this.events.set(await firstValueFrom(this.api.agentEvents(agent.id)));
     });
   }
 

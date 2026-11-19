@@ -1,0 +1,157 @@
+{
+  "findings": {
+    "rule": {
+      "telnet-open": {
+        "title": "Telnet attivo sulla porta {{port}}",
+        "description": "Telnet trasmette password e comandi in chiaro: chi è sulla stessa rete può leggerli. È anche un bersaglio comune dei malware per dispositivi IoT.",
+        "recommendation": "Disattiva Telnet dalle impostazioni del dispositivo e usa SSH o l'app ufficiale. Se non è possibile, aggiorna il firmware o valuta la sostituzione."
+      },
+      "ftp-cleartext": {
+        "title": "FTP senza cifratura sulla porta {{port}}",
+        "description": "FTP invia credenziali e file in chiaro sulla rete.",
+        "recommendation": "Disattiva FTP o usa SFTP / FTPS; se non serve, spegni il servizio."
+      },
+      "http-login-cleartext": {
+        "title": "Pagina di accesso senza HTTPS sulla porta {{port}}",
+        "description": "Le credenziali inserite in questa pagina viaggiano in chiaro sulla rete locale.",
+        "recommendation": "Abilita HTTPS nelle impostazioni del dispositivo, se disponibile, e usa una password unica."
+      },
+      "tls-legacy-protocol": {
+        "title": "Protocolli TLS obsoleti sulla porta {{port}} ({{versions}})",
+        "description": "TLS 1.0 e 1.1 sono deprecati e hanno debolezze note.",
+        "recommendation": "Aggiorna il firmware o disattiva TLS 1.0/1.1 nelle impostazioni, mantenendo TLS 1.2 o 1.3."
+      },
+      "tls-certificate-expired": {
+        "title": "Certificato scaduto sulla porta {{port}}",
+        "description": "Il certificato presentato dal dispositivo è scaduto: il browser mostra avvisi e diventa difficile accorgersi di un attacco.",
+        "recommendation": "Rinnova o rigenera il certificato dalle impostazioni del dispositivo o aggiorna il firmware."
+      },
+      "smb-v1-enabled": {
+        "title": "SMB1 attivo sulla porta {{port}}",
+        "description": "SMB1 è un protocollo obsoleto sfruttato da malware noti (es. ransomware).",
+        "recommendation": "Disattiva SMB1 e usa SMB2 o SMB3."
+      },
+      "upnp-exposed-mapping": {
+        "title": "Porta {{externalPort}} aperta verso Internet tramite UPnP",
+        "description": "Il router dichiara un inoltro automatico (UPnP) che rende raggiungibile da Internet la porta {{internalPort}} del dispositivo.",
+        "recommendation": "Rimuovi l'inoltro dal router, disattiva UPnP se non serve e usa l'accesso remoto ufficiale del produttore."
+      },
+      "upnp-igd-enabled": {
+        "title": "UPnP attivo sul router",
+        "description": "Qualsiasi dispositivo della rete può aprire porte verso Internet senza chiedere conferma.",
+        "recommendation": "Se non usi console o app che lo richiedono, disattiva UPnP nelle impostazioni del router."
+      },
+      "tr069-exposed": {
+        "title": "Porta di gestione remota TR-069 ({{port}}) raggiungibile",
+        "description": "TR-069 è usato dal provider per gestire il router da remoto. Di solito è normale, ma è utile saperlo.",
+        "recommendation": "Verifica con il provider che il firmware del router sia aggiornato."
+      },
+      "rtsp-open": {
+        "title": "Flusso video RTSP sulla porta {{port}}",
+        "description": "Il dispositivo offre un flusso video RTSP sulla rete locale. È stato inviato solo un controllo (OPTIONS): nessun video è stato aperto.",
+        "recommendation": "Verifica che il flusso richieda una password robusta; se non lo usi, disattivalo."
+      },
+      "mqtt-cleartext": {
+        "title": "MQTT senza cifratura sulla porta {{port}}",
+        "description": "I messaggi e le eventuali credenziali MQTT viaggiano in chiaro.",
+        "recommendation": "Usa MQTT su TLS (porta 8883) e richiedi l'autenticazione."
+      },
+      "snmp-enabled": {
+        "title": "SNMP attivo sulla porta {{port}}",
+        "description": "SNMP può esporre informazioni sul dispositivo; nessuna community è stata provata.",
+        "recommendation": "Se non serve, disattiva SNMP; altrimenti usa SNMPv3 con autenticazione."
+      },
+      "dns-open-resolver": {
+        "title": "Server DNS ricorsivo sulla porta {{port}}",
+        "description": "Un dispositivo diverso dal router risolve nomi per chiunque lo interroghi: può essere usato in modo improprio.",
+        "recommendation": "Verifica se il servizio DNS è voluto; se non serve, disattivalo."
+      },
+      "device-unknown": {
+        "title": "Dispositivo non identificato",
+        "description": "Non è stato possibile capire che tipo di dispositivo sia.",
+        "recommendation": "Controlla di cosa si tratta e imposta la categoria nella pagina dei dispositivi; se non lo riconosci, valuta di cambiare la password del Wi-Fi."
+      },
+      "cve-version-match": {
+        "title": "{{cve}} in {{product}} {{version}}",
+        "description": "La versione dichiarata dal servizio rientra in una vulnerabilità nota.",
+        "recommendation": "Aggiorna il firmware o il software del dispositivo all'ultima versione disponibile; se non ci sono aggiornamenti, limita l'accesso al servizio."
+      },
+      "cve-product-only": {
+        "title": "Vulnerabilità note per {{product}} (versione non determinata)",
+        "description": "Per questo prodotto esistono {{cves}} vulnerabilità note, ma la versione non è nota: non è possibile sapere se il dispositivo è interessato.",
+        "recommendation": "Verifica la versione installata nelle impostazioni del dispositivo e aggiornala se necessario."
+      }
+    },
+    "severity": {
+      "CRITICAL": "Critica",
+      "HIGH": "Alta",
+      "MEDIUM": "Media",
+      "LOW": "Bassa",
+      "INFORMATIONAL": "Informativa"
+    },
+    "status": {
+      "OPEN": "Aperto",
+      "ACKNOWLEDGED": "Preso in carico",
+      "RESOLVED": "Risolto",
+      "FALSE_POSITIVE": "Falso positivo",
+      "ACCEPTED_RISK": "Rischio accettato"
+    },
+    "type": {
+      "CONFIRMED_VULNERABILITY": {
+        "label": "Vulnerabilità confermata",
+        "explanation": "La versione è stata letta direttamente dal protocollo e corrisponde esattamente a una vulnerabilità nota."
+      },
+      "POTENTIAL_RISK": {
+        "label": "Rischio potenziale",
+        "explanation": "I dati raccolti indicano un possibile rischio, ma non è stato possibile confermarlo (versione dichiarata, intervallo di versioni o condizioni da verificare)."
+      },
+      "SUSPICIOUS_CONFIGURATION": {
+        "label": "Configurazione sospetta",
+        "explanation": "Il dispositivo ha risposto con una configurazione considerata poco sicura."
+      },
+      "UNVERIFIED_INFORMATION": {
+        "label": "Informazione da verificare",
+        "explanation": "Un'informazione utile da controllare, non necessariamente un problema."
+      }
+    }
+  },
+  "risk": {
+    "level": {
+      "LOW": "Rischio basso",
+      "MEDIUM": "Rischio medio",
+      "HIGH": "Rischio alto",
+      "CRITICAL": "Rischio critico"
+    },
+    "rating": {
+      "EXCELLENT": "Ottimo",
+      "GOOD": "Buono",
+      "FAIR": "Discreto",
+      "POOR": "Scarso",
+      "CRITICAL": "Critico"
+    }
+  },
+  "scans": {
+    "profiles": {
+      "DISCOVERY": "Rilevamento dispositivi",
+      "QUICK": "Rapida (porte principali)",
+      "STANDARD": "Standard (porte comuni)"
+    }
+  },
+  "devices": {
+    "categories": {
+      "ROUTER": "Router",
+      "IP_CAMERA": "Videocamera IP",
+      "SMART_TV": "Smart TV",
+      "SMARTPHONE": "Smartphone",
+      "TABLET": "Tablet",
+      "LAPTOP": "Portatile",
+      "DESKTOP": "Computer fisso",
+      "PRINTER": "Stampante",
+      "NAS": "NAS",
+      "SMART_PLUG": "Presa smart",
+      "SMART_SPEAKER": "Altoparlante smart",
+      "IOT": "Dispositivo IoT",
+      "UNKNOWN_DEVICE": "Non identificato"
+    }
+  }
+}

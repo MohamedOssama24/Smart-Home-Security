@@ -36,6 +36,7 @@ public final class PostgresTestContainer {
                     "/docker-entrypoint-initdb.d/01-roles.sh");
 
     private static final String JWT_PRIVATE_KEY = generateEcKey();
+    private static final String JOB_SIGNING_KEY = generateEd25519Key();
 
     static {
         POSTGRES.start();
@@ -51,6 +52,7 @@ public final class PostgresTestContainer {
         registry.add("SHSC_DB_MIGRATOR_USER", () -> MIGRATOR_USER);
         registry.add("SHSC_DB_MIGRATOR_PASSWORD", () -> MIGRATOR_PASSWORD);
         registry.add("SHSC_JWT_PRIVATE_KEY", () -> JWT_PRIVATE_KEY);
+        registry.add("SHSC_JOB_SIGNING_KEY", () -> JOB_SIGNING_KEY);
         registry.add("SHSC_PUBLIC_BASE_URL", () -> "https://shsc.test");
         registry.add("SHSC_MAIL_FROM", () -> "no-reply@shsc.test");
     }
@@ -61,6 +63,16 @@ public final class PostgresTestContainer {
             generator.initialize(new ECGenParameterSpec("secp256r1"));
             return Base64.getEncoder().encodeToString(generator.generateKeyPair().getPrivate().getEncoded());
         } catch (NoSuchAlgorithmException | java.security.InvalidAlgorithmParameterException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** Same format as infrastructure/scripts/generate-job-signing-key.sh (PKCS#8 DER, base64). */
+    private static String generateEd25519Key() {
+        try {
+            return Base64.getEncoder().encodeToString(
+                    KeyPairGenerator.getInstance("Ed25519").generateKeyPair().getPrivate().getEncoded());
+        } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
     }

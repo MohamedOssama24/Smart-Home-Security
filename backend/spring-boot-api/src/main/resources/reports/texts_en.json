@@ -1,0 +1,157 @@
+{
+  "findings": {
+    "rule": {
+      "telnet-open": {
+        "title": "Telnet enabled on port {{port}}",
+        "description": "Telnet sends passwords and commands in clear text: anyone on the same network can read them. It is also a common target of IoT malware.",
+        "recommendation": "Disable Telnet in the device settings and use SSH or the official app. If that is not possible, update the firmware or consider replacing the device."
+      },
+      "ftp-cleartext": {
+        "title": "Unencrypted FTP on port {{port}}",
+        "description": "FTP sends credentials and files in clear text over the network.",
+        "recommendation": "Disable FTP or use SFTP / FTPS; turn the service off if it is not needed."
+      },
+      "http-login-cleartext": {
+        "title": "Login page without HTTPS on port {{port}}",
+        "description": "Credentials typed in this page travel in clear text on the local network.",
+        "recommendation": "Enable HTTPS in the device settings if available and use a unique password."
+      },
+      "tls-legacy-protocol": {
+        "title": "Outdated TLS protocols on port {{port}} ({{versions}})",
+        "description": "TLS 1.0 and 1.1 are deprecated and have known weaknesses.",
+        "recommendation": "Update the firmware or disable TLS 1.0/1.1 in the settings, keeping TLS 1.2 or 1.3."
+      },
+      "tls-certificate-expired": {
+        "title": "Expired certificate on port {{port}}",
+        "description": "The certificate presented by the device has expired: browsers show warnings and an attack becomes hard to notice.",
+        "recommendation": "Renew or regenerate the certificate in the device settings or update the firmware."
+      },
+      "smb-v1-enabled": {
+        "title": "SMB1 enabled on port {{port}}",
+        "description": "SMB1 is an obsolete protocol exploited by well-known malware (e.g. ransomware).",
+        "recommendation": "Disable SMB1 and use SMB2 or SMB3."
+      },
+      "upnp-exposed-mapping": {
+        "title": "Port {{externalPort}} opened to the Internet via UPnP",
+        "description": "The router declares an automatic forwarding (UPnP) that makes port {{internalPort}} of the device reachable from the Internet.",
+        "recommendation": "Remove the forwarding from the router, disable UPnP if not needed and use the vendor's official remote access."
+      },
+      "upnp-igd-enabled": {
+        "title": "UPnP enabled on the router",
+        "description": "Any device of the network can open ports to the Internet without asking.",
+        "recommendation": "Unless game consoles or apps need it, disable UPnP in the router settings."
+      },
+      "tr069-exposed": {
+        "title": "TR-069 remote management port ({{port}}) reachable",
+        "description": "TR-069 is used by the provider to manage the router remotely. It is usually normal, but worth knowing.",
+        "recommendation": "Check with the provider that the router firmware is up to date."
+      },
+      "rtsp-open": {
+        "title": "RTSP video stream on port {{port}}",
+        "description": "The device offers an RTSP video stream on the local network. Only a check (OPTIONS) was sent: no video was opened.",
+        "recommendation": "Make sure the stream requires a strong password; disable it if you do not use it."
+      },
+      "mqtt-cleartext": {
+        "title": "Unencrypted MQTT on port {{port}}",
+        "description": "MQTT messages and any credentials travel in clear text.",
+        "recommendation": "Use MQTT over TLS (port 8883) and require authentication."
+      },
+      "snmp-enabled": {
+        "title": "SNMP enabled on port {{port}}",
+        "description": "SNMP can expose information about the device; no community was tried.",
+        "recommendation": "Disable SNMP if not needed; otherwise use SNMPv3 with authentication."
+      },
+      "dns-open-resolver": {
+        "title": "Recursive DNS server on port {{port}}",
+        "description": "A device other than the router resolves names for anyone who asks: it can be misused.",
+        "recommendation": "Check whether the DNS service is intended; disable it if not needed."
+      },
+      "device-unknown": {
+        "title": "Unidentified device",
+        "description": "It was not possible to tell what kind of device this is.",
+        "recommendation": "Check what it is and set its category in the devices page; if you do not recognize it, consider changing the Wi-Fi password."
+      },
+      "cve-version-match": {
+        "title": "{{cve}} in {{product}} {{version}}",
+        "description": "The version declared by the service falls within a known vulnerability.",
+        "recommendation": "Update the device firmware or software to the latest available version; if there is no update, restrict access to the service."
+      },
+      "cve-product-only": {
+        "title": "Known vulnerabilities for {{product}} (version not determined)",
+        "description": "There are {{cves}} known vulnerabilities for this product, but its version is unknown: it is not possible to tell whether the device is affected.",
+        "recommendation": "Check the installed version in the device settings and update it if needed."
+      }
+    },
+    "severity": {
+      "CRITICAL": "Critical",
+      "HIGH": "High",
+      "MEDIUM": "Medium",
+      "LOW": "Low",
+      "INFORMATIONAL": "Informational"
+    },
+    "status": {
+      "OPEN": "Open",
+      "ACKNOWLEDGED": "Acknowledged",
+      "RESOLVED": "Resolved",
+      "FALSE_POSITIVE": "False positive",
+      "ACCEPTED_RISK": "Accepted risk"
+    },
+    "type": {
+      "CONFIRMED_VULNERABILITY": {
+        "label": "Confirmed vulnerability",
+        "explanation": "The version was read from the protocol itself and exactly matches a known vulnerability."
+      },
+      "POTENTIAL_RISK": {
+        "label": "Potential risk",
+        "explanation": "The collected data points to a possible risk that could not be confirmed (declared version, version range or conditions to check)."
+      },
+      "SUSPICIOUS_CONFIGURATION": {
+        "label": "Suspicious configuration",
+        "explanation": "The device answered with a configuration considered unsafe."
+      },
+      "UNVERIFIED_INFORMATION": {
+        "label": "Information to check",
+        "explanation": "Useful information to check, not necessarily a problem."
+      }
+    }
+  },
+  "risk": {
+    "level": {
+      "LOW": "Low risk",
+      "MEDIUM": "Medium risk",
+      "HIGH": "High risk",
+      "CRITICAL": "Critical risk"
+    },
+    "rating": {
+      "EXCELLENT": "Excellent",
+      "GOOD": "Good",
+      "FAIR": "Fair",
+      "POOR": "Poor",
+      "CRITICAL": "Critical"
+    }
+  },
+  "scans": {
+    "profiles": {
+      "DISCOVERY": "Device discovery",
+      "QUICK": "Quick (main ports)",
+      "STANDARD": "Standard (common ports)"
+    }
+  },
+  "devices": {
+    "categories": {
+      "ROUTER": "Router",
+      "IP_CAMERA": "IP camera",
+      "SMART_TV": "Smart TV",
+      "SMARTPHONE": "Smartphone",
+      "TABLET": "Tablet",
+      "LAPTOP": "Laptop",
+      "DESKTOP": "Desktop computer",
+      "PRINTER": "Printer",
+      "NAS": "NAS",
+      "SMART_PLUG": "Smart plug",
+      "SMART_SPEAKER": "Smart speaker",
+      "IOT": "IoT device",
+      "UNKNOWN_DEVICE": "Unidentified"
+    }
+  }
+}

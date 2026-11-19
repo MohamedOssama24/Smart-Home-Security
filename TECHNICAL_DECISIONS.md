@@ -217,3 +217,309 @@ Autorizzare non avvia nulla: nell'MVP non esistono scansioni automatiche.
 
 ### ADR-030 — PUT a sostituzione completa, PATCH solo per gli utenti
 **Decisione**: organizzazione, clienti, abitazioni e reti si aggiornano con `PUT`, inviando tutti i campi modificabili: i campi facoltativi omessi vengono svuotati. Così il client non ha ambiguità tra "non inviato" e "da cancellare". Per gli utenti `PATCH` resta parziale, perché nome e stato sono operazioni indipendenti con regole diverse (disattivazione = revoca sessioni).
+
+### ADR-031 — Coda locale dell'agent in SQLite puro Go (`modernc.org/sqlite`)
+**Decisione**: la coda offline dell'agent è un database SQLite (`queue.db`, WAL, `synchronous=FULL`) gestito con `modernc.org/sqlite` v1.62 (licenza BSD-3, open source, gratuito), una traduzione in Go puro di SQLite. Ogni elemento ha una chiave scelta dal produttore (idempotenza), viene cancellato solo dopo la conferma del backend e la coda ha un tetto di 200 MB oltre il quale si eliminano i più vecchi con evento `QUEUE_OVERFLOW`.
+
+**Motivazione**: è la scelta già prevista dal protocollo (doc 03 §8). Il driver puro Go evita cgo e un compilatore C, quindi la cross-compilazione dei 7 binari (Windows, Linux, macOS, ARM) resta un semplice `go build`. Alternativa scartata: `mattn/go-sqlite3` (richiede cgo).
+
+### ADR-032 — Servizi di sistema con `golang.org/x/sys`, senza `kardianos/service`
+**Decisione**: installazione e gestione del servizio sono scritte direttamente: Windows con `golang.org/x/sys/windows/svc` e `svc/mgr` (BSD-3, mantenuto dal team Go), Linux con un file di unità systemd generato, macOS con un plist launchd generato.
+
+**Motivazione**: serve un controllo fine che la libreria generica non offre in modo uniforme: account `LocalService`, avvio ritardato e azioni di ripristino su Windows; `CAP_NET_RAW` come unico privilegio e sandboxing su systemd; nessun riavvio dopo una revoca (codici di uscita 3 e 4 esclusi, `KeepAlive` launchd legato all'esistenza di `agent.json`). `x/sys` serve comunque per DPAPI, ACL e iphlpapi. Una dipendenza in meno.
+
+### ADR-033 — Heartbeat ogni 25 s, intervallo deciso dal server
+**Decisione**: l'agent invia l'heartbeat ogni 25 s (`shsc.agent.heartbeat-interval`, comunicato nella risposta), anticipando a caso fino al 10 %, mai ritardando. La connettività è calcolata alla lettura: ONLINE < 3 min, STALE < 15 min, poi OFFLINE.
+
+**Motivazione**: il criterio della milestone chiede che un agent revocato smetta di operare entro 30 s. Il backend ricontrolla la credenziale a ogni richiesta, quindi l'intervallo di heartbeat è il ritardo massimo: 25 s lascia margine per la latenza. Il costo è basso (una richiesta piccola ogni 25 s per agent) e l'intervallo si può aumentare dal server senza aggiornare gli agent.
+
+### ADR-034 — Chiave privata dell'agent su Windows: DPAPI machine scope e ACL esplicita
+**Decisione**: su Windows la chiave Ed25519 è cifrata con DPAPI in ambito macchina con entropia applicativa e la cartella di stato riceve una ACL protetta (SYSTEM, Administrators, LocalService, utente che ha fatto l'enrollment). Su Linux e macOS resta un file `0600` in una cartella `0700` di root/`shsc` (il Keychain di sistema di macOS è rimandato).
+
+**Motivazione**: su Windows i permessi POSIX non hanno effetto e `%ProgramData%` eredita permessi di lettura per gli utenti. L'ambito macchina permette al servizio `LocalService` di leggere la chiave creata da un amministratore durante l'enrollment; un file copiato su un'altra macchina è inutilizzabile. Il Keychain di macOS richiederebbe cgo o un processo esterno e non migliora la protezione rispetto a root + `0600` per un daemon.
+
+### ADR-035 — Limite di agent per abitazione
+**Decisione**: `plans.max_agents_per_home` (FREE: 2). Il limite conta solo agent `ACTIVE` ed è verificato due volte: alla creazione del token (per avvisare subito) e all'enrollment, nella stessa transazione e sotto lo stesso lock del tenant degli altri limiti (ADR-027). Se l'enrollment è rifiutato il token resta utilizzabile.
+
+**Motivazione**: completa i limiti del piano FREE rimandati dalla M4. Due agent coprono il caso tipico (un PC e un mini-PC o Raspberry); revocare un agent libera il posto.
+
+### ADR-036 — Eventi dell'agent: idempotenti, ultimi 500 per agent
+**Decisione**: gli eventi hanno un `id` scelto dall'agent e un vincolo `UNIQUE(agent_id, event_id)`, così un reinvio dopo una conferma persa è un duplicato innocuo. Il backend conserva gli ultimi 500 eventi per agent (pulizia a ogni consegna) e limita `detail` a 4 KB; date oltre 5 minuti nel futuro sono sostituite con l'ora del server. Nessun partizionamento della tabella nell'MVP.
+
+**Motivazione**: gli eventi servono alla diagnosi recente, non all'audit (che resta in `audit_logs`). Un tetto per agent limita lo spazio occupato da un agent difettoso o malevolo senza un job di pulizia separato.
+
+### ADR-037 — Job di scansione firmati Ed25519 con chiave pubblica fissata nell'agent
+**Decisione**: il backend firma ogni job con una chiave Ed25519 dedicata (`SHSC_JOB_SIGNING_KEY`, diversa da quella dei JWT). L'agent riceve la chiave pubblica all'enrollment, la salva in `agent.json` e rifiuta ogni job non firmato con quella chiave. Gli agent registrati prima della M6 la ottengono una sola volta dalla sessione, su TLS verificato.
+
+**Motivazione**: il job decide quali reti l'agent sonda. Con la firma, nemmeno chi controlla un proxy o il canale TLS può far sondare all'agent reti diverse da quelle autorizzate. Ed25519 è nella libreria standard di Java e di Go: nessuna dipendenza nuova.
+
+### ADR-038 — Long polling sui thread virtuali invece di WebSocket
+**Decisione**: l'agent ritira i job con `GET /agent/jobs/next?wait≤25`. La richiesta resta aperta su un thread virtuale, viene svegliata dopo il commit della richiesta di scansione e il backend ricontrolla il database ogni 5 s.
+
+**Motivazione**: funziona dietro proxy e firewall domestici come una normale richiesta HTTPS, senza nuove dipendenze né stato di connessione da gestire in nginx. Il ricontrollo periodico copre più istanze del backend e notifiche perse. Una connessione aperta per agent costa poco sui thread virtuali.
+
+### ADR-039 — Lease rinnovato dal progress e reaper nel database
+**Decisione**: una scansione `RUNNING` ha un lease di 2 min rinnovato da ogni progress. Un reaper ogni 30 s fa fallire le scansioni con coda scaduta (10 min), lease scaduto o durata oltre 15 min. Usa una funzione `SECURITY DEFINER` perché opera su tutti i tenant nonostante la RLS. I risultati arrivati dopo un `AGENT_LOST` sono accettati per 24 h (`LATE_UPLOAD`).
+
+**Motivazione**: nessuna scansione resta "in corso" per sempre se l'agent si spegne. La funzione espone solo gli identificativi da chiudere, senza dare al ruolo applicativo il bypass della RLS. La finestra di 24 h evita di perdere il lavoro di un agent rimasto senza connessione.
+
+### ADR-040 — Risultati a lotti idempotenti e verifica dell'ambito lato server
+**Decisione**: i risultati arrivano in lotti numerati (massimo 500), idempotenti su `(scan_id, batch_seq)`; `complete` richiede tutti i lotti. Ogni IP è confrontato con gli obiettivi della scansione: quelli fuori ambito sono scartati, contati e registrati in audit.
+
+**Motivazione**: la coda locale dell'agent può reinviare. Il backend non si fida dell'agent per l'ambito: la regola "nessun dato da reti non autorizzate" vale anche per un agent difettoso o compromesso.
+
+### ADR-041 — Discovery M6 solo ARP, senza dipendenze di cattura
+**Decisione**: Windows usa `SendARP` (IP Helper API); Linux usa socket `AF_PACKET` con `CAP_NET_RAW` e, senza la capability, legge `/proc/net/arp`. macOS è rimandato. Nessun Npcap, libpcap o gopacket.
+
+**Motivazione**: è la discovery minima prevista dalla roadmap. Funziona senza installare driver e senza privilegi su Windows, ed è limitata alle sottoreti collegate direttamente. ICMP, mDNS e SSDP arrivano con la milestone della discovery completa.
+
+### ADR-042 — `golang.org/x/net` per ICMP, IPv4/IPv6 e messaggi DNS
+**Decisione**: i pacchetti `icmp`, `ipv4`, `ipv6` e `dns/dnsmessage` di `golang.org/x/net` (v0.62.0, BSD-3-Clause, gratuito, mantenuto dal Go team) per echo ICMP/ICMPv6, opzioni multicast e mDNS/DNS-SD. Su Windows l'ICMP usa l'IP Helper API (`IcmpSendEcho2Ex`) tramite `golang.org/x/sys`, già presente.
+
+**Alternative**: `miekg/dns` (BSD-3, più ampio del necessario), `hashicorp/mdns` (MIT, non permette di scegliere interfaccia e limiti), `pro-bing` (MIT, solo ICMP). Scartate per superficie e controllo dell'ambito.
+
+### ADR-043 — `gosnmp` per l'integrazione SNMP del router
+**Decisione**: `github.com/gosnmp/gosnmp` v1.47.0 (BSD-2-Clause, gratuito) per SNMP v2c/v3 in sola lettura (Get, BulkWalk). Usato solo con credenziali configurate dal proprietario; community `public`/`private` rifiutate.
+
+**Alternative**: implementazione BER propria (rischio di errori, USM v3 complesso), net-snmp via cgo (dipendenza nativa, cross-compilazione). Scartate.
+
+### ADR-044 — URL annunciati dai dispositivi: solo l'IP del dispositivo stesso
+**Decisione**: un URL annunciato (SSDP `LOCATION`, UPnP `controlURL`/`URLBase`, TR-064) è seguito solo se è `http`, senza user-info e con host uguale all'IP letterale del dispositivo che lo ha annunciato, nell'ambito. Client senza proxy né redirect, dialer vincolato a quell'IP, 3 s, 256 KB, `encoding/xml`.
+
+**Motivazione**: un dispositivo ostile potrebbe usare l'agent per raggiungere altri host (SSRF), anche fuori dalle reti autorizzate. Il vincolo nel dialer protegge anche da errori futuri nel controllo degli URL.
+
+### ADR-045 — Credenziali del router solo sull'agent
+**Decisione**: le credenziali TR-064/SNMP sono inserite dal proprietario sull'agent (`shsc-agent router`, segreti da stdin) e salvate protette come la chiave dell'agent; il backend conosce solo i nomi delle integrazioni. Un rifiuto delle credenziali interrompe l'integrazione senza retry.
+
+**Motivazione**: il SaaS non deve custodire credenziali della rete domestica; il dato resta dove viene usato. Nessun tentativo ripetuto evita blocchi dell'account del router e qualsiasi somiglianza con il password guessing.
+
+### ADR-046 — Ruleset di classificazione in JSON, validato all'avvio
+**Decisione**: le regole di fingerprinting stanno in `fingerprint/rules.json` (versione nel file, salvata con ogni risultato), lette con Jackson già presente e validate all'avvio: id univoci, nessuna regola che conclude `UNKNOWN_DEVICE`, peso `WEAK` sempre sotto la soglia. Un ruleset non valido blocca l'avvio.
+
+**Motivazione**: docs/07 prevedeva YAML, che avrebbe richiesto un parser in più (nessuna nuova dipendenza è stata aggiunta). JSON è già supportato, versionabile in git e testabile; la validazione impedisce che un errore nelle regole porti a classificazioni sbagliate in silenzio.
+
+### ADR-047 — Classificazione: soglia più indizi indipendenti, mai un solo indizio debole
+**Decisione**: pesi STRONG 60 / MODERATE 30 / WEAK 10, soglia 50; una categoria è scelta solo con un indizio STRONG o due MODERATE da fonti diverse. Conferma indipendente → alta; un'altra categoria qualificata abbassa di un livello; parità → `UNKNOWN_DEVICE`. La categoria manuale non è mai sovrascritta; una rilevazione diversa e affidabile è solo un suggerimento.
+
+**Motivazione**: un falso "è una telecamera" è peggio di "non identificato": il rischio (M10) dipenderà dalla categoria. Il produttore OUI è quello della scheda di rete, quindi resta un indizio debole.
+
+### ADR-048 — Registro OUI IEEE nel backend, sincronizzazione solo manuale
+**Decisione**: i CSV pubblici IEEE (MA-L, MA-M, MA-S) sono scaricati solo su richiesta di un amministratore di piattaforma, con HTTPS, limiti di dimensione e tempo, e sostituiti in un'unica transazione solo se tutti i file sono stati letti. La ricerca avviene nel backend; lo snapshot per l'agent previsto in docs/07 non è necessario. Sorgenti configurabili (`SHSC_OUI_SOURCES`).
+
+**Motivazione**: nessun servizio a pagamento né account; nessuna attività automatica verso l'esterno; un download fallito non lascia il registro a metà. L'agent non ha bisogno del registro perché la classificazione è fatta lato server.
+
+### ADR-049 — Porte: salvate solo quelle aperte, le altre come contatori per host
+**Decisione**: `open_ports` contiene solo le porte `OPEN`, una riga per scansione; chiuse, filtrate, `OPEN_FILTERED` e `UNKNOWN` sono contate per host nell'osservazione `PORTSCAN` (con profilo e versione della lista). docs/08 prevedeva di salvare singolarmente anche filtrate e sconosciute; il vincolo unico è `(scan, ip, protocollo, porta)` invece di `(scan, device, …)` perché il dispositivo è noto solo alla chiusura della scansione.
+
+**Motivazione**: STANDARD × 1024 host produrrebbe centinaia di migliaia di righe senza valore per l'utente né per il rischio; i contatori bastano per la copertura e per spiegare "senza risposta". Il collegamento al dispositivo avviene nel fingerprinting, nella stessa transazione della chiusura.
+
+### ADR-050 — Liste porte nell'agent, versionate; UDP solo con probe sicura
+**Decisione**: liste `QUICK`/`STANDARD` in `portlists.json` incorporato nell'agent (`go:embed`), versionato e validato all'avvio; il job firmato indica solo il profilo e i limiti. Una porta UDP è ammessa nella lista solo se esiste una probe di protocollo sicura; altrimenti la lista è rifiutata e la porta non viene mai contattata.
+
+**Motivazione**: l'agent non deve poter ricevere dal server liste arbitrarie (difesa in profondità contro un backend compromesso); un file dati evita porte nel codice come richiesto da docs/08. Nessuna nuova dipendenza.
+
+### ADR-051 — Profili DEEP e CUSTOM rimandati alla M17
+**Decisione**: in M9 sono disponibili solo `QUICK` e `STANDARD` (anche per il piano FREE); `DEEP` e `CUSTOM` restano `400 PROFILE_NOT_AVAILABLE` e l'agent rifiuta job con profili sconosciuti.
+
+**Motivazione**: sono legati ai piani a pagamento (M17) e `CUSTOM` richiede una validazione dei range che oggi non serve.
+
+### ADR-052 — Timeout TCP fisso dal job, non adattivo
+**Decisione**: timeout di connessione fisso (1,5 s dal job, ammessi 200–5000 ms) con un retry; il timeout adattivo sull'RTT ICMP di docs/08 non è implementato.
+
+**Motivazione**: sulle LAN domestiche l'RTT è di pochi millisecondi e l'ICMP spesso è bloccato o non disponibile senza privilegi; un valore fisso e limitato è più prevedibile e verificabile. Da rivalutare con le misure della M18.
+
+### ADR-053 — SMB: NEGOTIATE 2.0.2–3.0.2 e SMB1, senza 3.1.1
+**Decisione**: l'agent invia solo `NEGOTIATE` SMB2 con i dialetti 2.0.2, 2.1, 3.0, 3.0.2 e un `NEGOTIATE` SMB1 ("NT LM 0.12") per sapere se SMB1 è accettato; mai `SESSION_SETUP`. Il dialetto 3.1.1 non è offerto.
+
+**Motivazione**: 3.1.1 richiede i contesti di negoziazione (pre-auth integrity, cifratura) e non cambia ciò che interessa al rischio (SMB1 attivo, firma non obbligatoria); un dispositivo solo-3.1.1 risulta comunque `smb` probabile sulla porta 445.
+
+### ADR-054 — Feed di vulnerabilità solo su richiesta, mirror limitato al dizionario CPE
+**Decisione**: NVD, CISA KEV e FIRST EPSS sono sincronizzati solo quando un amministratore di piattaforma lo chiede (in background, una sincronizzazione alla volta); la sincronizzazione incrementale ogni 6 h di docs/09 non è implementata. Dalla NVD si scaricano solo le CVE dei prodotti del dizionario curato (`virtualMatchString`), con tutte le pagine lette prima di sostituire il mirror in un'unica transazione; EPSS solo per le CVE salvate. API key NVD opzionale e mai registrata nei log.
+
+**Motivazione**: nessuna attività automatica verso l'esterno (come per l'OUI, ADR-048) e nessun servizio a pagamento; il mirror completo NVD (oltre 250 000 CVE) non serve, perché solo i prodotti del dizionario possono produrre un match. Un feed fallito non lascia dati a metà.
+
+### ADR-055 — Matching CVE conservativo con dizionario curato e affidabilità della versione
+**Decisione**: il prodotto dichiarato da un servizio diventa un CPE solo tramite un dizionario curato con nome intero per servizio (mai fuzzy, mai solo produttore); ogni voce indica l'affidabilità della versione (banner di protocollo `HIGH`, header HTTP/RTSP `MEDIUM`). `CONFIRMED_VULNERABILITY` solo con versione `HIGH`, servizio confermato, match esatto o nel range e nessuna condizione di piattaforma; configurazioni NVD negate ignorate, configurazioni AND → `POTENTIAL_RISK` con affidabilità bassa; versione ignota → un solo finding aggregato `PRODUCT_ONLY`. Il "CPE dictionary" NVD di docs/09 non è scaricato.
+
+**Motivazione**: un falso "vulnerabilità confermata" mina la fiducia più di una mancata segnalazione; gli header HTTP sono facili da falsificare o generici. Il dizionario è piccolo, versionato e verificabile nei test; il CPE dictionary NVD porterebbe proprio i match approssimativi da evitare.
+
+### ADR-056 — Catalogo regole M10: differenze da docs/09
+**Decisione**: `snmp.enabled` è LOW/`POTENTIAL_RISK` (nessuna community viene mai provata, ADR-012: non si può dire che usi quella di default); `upnp.igd-enabled` e `dns.open-resolver` sono `POTENTIAL_RISK` (abilitano un abuso ma non sono una configurazione verificata come errata); `tls.legacy-protocol` considera TLS 1.0 e 1.1 (MEDIUM se non c'è niente di più recente); "nuovo dispositivo sconosciuto" diventa `device.unknown` (ogni dispositivo non identificato senza categoria manuale, finché l'utente non la imposta); la regola "firmware più vecchio dell'ultima versione nota" non è implementata.
+
+**Motivazione**: tipo e gravità devono riflettere ciò che è stato davvero osservato. Per il firmware manca una fonte affidabile e gratuita dell'ultima versione per modello: una regola senza dati sarebbe una funzionalità finta.
+
+### ADR-057 — Analisi alla chiusura della scansione; RESOLVED solo per ciò che la scansione ha coperto
+**Decisione**: l'analisi gira nella transazione di chiusura della scansione, dopo il fingerprinting, solo sui dispositivi visti; non c'è rianalisi delle scansioni passate (`analysis_version` di docs/09 non implementato: le nuove CVE valgono dalla scansione successiva). Un finding di porta è risolto solo se il riepilogo `PORTSCAN` del dispositivo non è in pausa, ha la versione della lista porte del backend e il profilo della scansione, e la porta è nella lista di quel profilo; i finding UPnP solo se i dati del router sono stati letti; i finding di dispositivo se il dispositivo è stato visto.
+
+**Motivazione**: "non rilevato" non significa "risolto" se la porta non è stata controllata (profilo diverso, host in pausa, router che rifiuta UPnP); i dati restano coerenti con la scansione che li ha prodotti. La rianalisi retroattiva cambierebbe lo storico senza una nuova osservazione.
+
+### ADR-058 — Copia delle liste porte nel backend, verificata da test
+**Decisione**: `resources/findings/portlists.json` è una copia di `agent/go-security-agent/internal/portscan/portlists.json`; un test fallisce se i due file differiscono e la risoluzione dei finding di porta richiede che la versione dichiarata dall'agent coincida con quella del backend.
+
+**Motivazione**: il backend deve sapere quali porte un profilo ha controllato senza ricevere dall'agent l'elenco di tutte le porte chiuse; la copia evita un accoppiamento di build fra Go e Java, e il test impedisce che diverga. Con versioni diverse non si risolve nulla (scelta prudente).
+
+### ADR-059 — Il punteggio usa il permesso `finding:read`
+**Decisione**: `GET /homes/{id}/risk`, `/risk/history` e `/vulnerabilities` richiedono `finding:read`; nessun permesso `risk:read` dedicato.
+
+**Motivazione**: il punteggio è un riassunto dei finding (il breakdown li elenca con titolo e dispositivo): chi può leggere il punteggio deve poter leggere i finding, e viceversa. Un permesso separato non proteggerebbe nulla in più e complicherebbe la matrice dei ruoli.
+
+### ADR-060 — Giudizio separato dal livello di rischio
+**Decisione**: oltre a `risk_level` (soglie di docs/09 §3.3) ogni snapshot ha `rating`: `LOW` → `EXCELLENT` solo con copertura ≥ 0.8 e punteggio non provvisorio, altrimenti `GOOD`; `MEDIUM` → `FAIR`; `HIGH` → `POOR`; `CRITICAL` → `CRITICAL`.
+
+**Motivazione**: docs/09 vieta il giudizio "Ottimo" sotto 0.8 di copertura senza definire la scala. Un campo esplicito e salvato evita che la dashboard e l'app (M14) lo ricalcolino in modo diverso.
+
+### ADR-061 — Input della copertura
+**Decisione**:
+- **Dispositivi visti**: dispositivi dell'inventario visti dalla scansione. **Analizzati**: quelli con riepilogo `PORTSCAN` non in pausa.
+- **Tecniche**: ARP 0.4 e ICMP, mDNS, SSDP 0.2 ciascuna. Una tecnica fallisce con l'avviso `<TECNICA>_UNAVAILABLE`.
+- **Integrazione router**: 1 solo se TR-064 o SNMP hanno restituito osservazioni.
+- **Profilo `DEEP`**: non esiste; il suo peso resta nel modello.
+
+**Motivazione**: sono dati già raccolti e affidabili; nessuna nuova richiesta all'agent. UPnP IGD non conta come integrazione, perché è dichiarato dal router e non configurato dal proprietario.
+
+### ADR-062 — Doppio peso KEV mantenuto
+**Decisione**: una CVE nel catalogo KEV alza già la gravità del finding di un livello (M10). Il motore applica comunque il fattore KEV 1.5 di docs/09, letto dal catalogo al momento del calcolo. Il limite di 45 punti per dispositivo resta.
+
+**Motivazione**: una vulnerabilità sfruttata attivamente è il segnale più forte disponibile. Il doppio peso è voluto per ora e documentato; il limite per dispositivo evita che un singolo finding azzeri il punteggio. La taratura dei pesi è prevista in M18 con una nuova `engine_version`.
+
+### ADR-063 — Snapshot `TRIAGE`, punteggio nullo per `DISCOVERY`, arrotondamento per difetto, pesi nel codice
+**Decisione**:
+- Un triage che cambia i finding conteggiati crea uno snapshot `TRIAGE`, con la scansione e la copertura dell'ultimo snapshot.
+- Una scansione `DISCOVERY` salva uno snapshot con `score` nullo e `PORT_SCAN_REQUIRED`.
+- Il punteggio è arrotondato per difetto.
+- I pesi sono costanti di `RiskEngine` con `ENGINE_VERSION` registrata in ogni snapshot; non c'è un file di configurazione.
+
+**Motivazione**: segnare un falso positivo deve cambiare subito il punteggio, senza riscrivere lo storico. Senza porte un punteggio sembrerebbe più sicuro del vero, ma la copertura resta utile. Arrotondando per eccesso un problema piccolo sparirebbe. Pesi tipizzati e versionati nel codice sono verificati dai test, e uno snapshot vecchio resta legato alla versione che lo ha prodotto.
+
+### ADR-064 — Playwright per gli E2E della dashboard
+**Decisione**: `@playwright/test` 1.65.1 come dipendenza di sviluppo (versione esatta). Gli E2E girano sulla build di produzione servita da un piccolo server statico (`e2e/serve.mjs`, senza dipendenze); ogni chiamata `/api` riceve dati `[MOCK]` intercettati nel browser. Due profili: desktop e mobile (Pixel 7). In locale si usa l'immagine `mcr.microsoft.com/playwright:v1.65.1-noble`, in CI `playwright install --with-deps chromium`.
+
+**Licenza e costo**: Apache-2.0, gratuito; non entra nel bundle di produzione.
+
+**Alternative**: Cypress (più pesante, profilo mobile meno fedele), solo test unitari (non verificano routing reale, layout e overflow su schermi piccoli). Gli E2E contro il backend reale restano nella verifica manuale e nella M18: qui verificano la dashboard senza toccare reti o dispositivi.
+
+### ADR-065 — Panoramica con un endpoint aggregato e mappa di rete logica senza librerie
+**Decisione**:
+- `GET /api/v1/overview` restituisce le abitazioni visibili (`home:read`, con gli scope dell'utente) e, solo dove l'utente ha `finding:read` sull'abitazione, punteggio dell'ultimo snapshot calcolato, motivo dell'eventuale snapshot non calcolato, finding conteggiati per gravità, KEV, dispositivi e ultima scansione. Le cifre sono lette con una query per tipo di dato, non per abitazione.
+- La mappa di rete è calcolata nel browser da dati già esposti (dispositivi, reti, breakdown dell'ultimo snapshot): una stella per rete autorizzata con il router al centro, anelli di dispositivi, SVG disegnato a mano. È dichiaratamente **logica**: il cablaggio e il Wi-Fi reali non sono osservabili dalla LAN. Una tabella ripete gli stessi dati.
+
+**Motivazione**: una chiamata per abitazione dalla pagina non scala per gli installatori B2B. Il permesso sui dati di sicurezza resta quello della pagina del rischio (ADR-059). Una libreria di grafi (es. Cytoscape, D3) aggiungerebbe peso e un layout fisico che suggerirebbe una topologia che non conosciamo.
+
+### ADR-066 — Apache PDFBox per i report PDF
+**Decisione**: `org.apache.pdfbox:pdfbox` 3.0.8 (luglio 2026) nel backend. Il report è disegnato da codice (`ReportRenderer`) con i font PDF standard, senza HTML e senza font incorporati. Data di creazione e ID del documento sono fissati dai dati del report, così il risultato è deterministico.
+
+**Licenza e costo**: Apache-2.0, gratuito; dipendenze transitive `pdfbox-io`, `fontbox` e `commons-logging`, tutte Apache-2.0.
+
+**Alternative**:
+- OpenPDF (LGPL/MPL) e openhtmltopdf (LGPL), con licenze meno semplici per un SaaS commerciale;
+- JasperReports, troppo pesante;
+- generazione nel browser, che non dà un documento uguale per tutti e non è riusabile dall'app (M14).
+
+Con il disegno da codice, il test snapshot verifica testo e layout senza un motore di template.
+
+**Limite**: i font standard coprono solo l'alfabeto latino (WinAnsi); gli altri caratteri sono sostituiti. Un font Unicode incorporato può essere aggiunto in seguito, con licenza OFL.
+
+### ADR-067 — Alert e report nel database: consegne per utente, coda email a polling, PDF in `bytea`
+**Decisione**:
+- **Alert**:
+  - creati nella transazione dell'evento, con deduplicazione affidata a un indice unico parziale e a `INSERT … ON CONFLICT`;
+  - le consegne (`alert_deliveries`) sono decise alla creazione per utente e canale, secondo permessi e preferenze. Lo stato di lettura è per utente; i permessi sono ricontrollati in lettura.
+- **Email**: messe in coda come righe `PENDING` e inviate da un job ogni 30 secondi, con 3 tentativi (5 e 15 minuti).
+  - Il job legge gli id tra i tenant con una funzione `SECURITY DEFINER` e tratta ogni consegna nella transazione del suo tenant, come il reaper delle scansioni.
+  - Un secondo job crea `AGENT_OFFLINE` dopo 15 minuti senza heartbeat.
+- **Report**:
+  - generati in background (virtual thread) dopo il commit della richiesta, e salvati in `reports.content` (`bytea`, massimo 10 MB) con SHA-256;
+  - i testi di regole, gravità e categorie sono copiati dalla dashboard con uno script e verificati da un test.
+
+**Motivazione**:
+- **Database invece di broker o object storage**: nessun servizio in più da gestire o pagare per l'MVP su una VPS. L'email non parte se la transazione fallisce e sopravvive a un riavvio; le righe sono protette da RLS.
+- **PDF in `bytea`**: pochi KB per report, backup già incluso nel `pg_dump`.
+- **Destinatari decisi alla creazione**: permettono "una sola email per evento" e uno storico coerente.
+- **Testi copiati**: con un unico testo per regola, dashboard, email e PDF dicono la stessa cosa.
+
+**Rivedere quando**: volumi alti di email (code dedicate) o report numerosi e grandi (object storage S3-compatibile). Restano entrambi dietro `AlertJobs` e `ReportRepository`.
+
+### ADR-068 — Dipendenze dell'app Flutter (M14)
+**Decisione**: app in `mobile/shsc_app` con Flutter 3.44.0 / Dart 3.12 (immagine Docker `ghcr.io/cirruslabs/flutter`, nessuna installazione locale) e le dipendenze già previste da docs/01 §3 e docs/06:
+- `flutter_riverpod` 3.5.0 (stato), `dio` 5.11.1 (HTTP), `go_router` 18.1.4 (navigazione);
+- `flutter_secure_storage` 11.2.0 (refresh token in Keystore/Keychain, `this_device`, backup Android disattivato);
+- `firebase_core` 5.2.0 e `firebase_messaging` 17.1.0 (push FCM);
+- `intl` 0.20.2 e `flutter_localizations` (IT/EN con `gen-l10n`); `integration_test` (SDK) per i test su dispositivo.
+
+**Licenze e costo**: BSD-3 (Flutter, `intl`, `firebase_*`), MIT (`riverpod`, `dio`, `go_router`), BSD-3 (`flutter_secure_storage`). FCM è gratuito; il progetto Firebase è del proprietario e non è creato dal codice.
+
+**Alternative**: `http` invece di `dio` (niente interceptor per la rotazione del refresh token); `provider`/`bloc` invece di Riverpod (docs/01 indica già Riverpod); notifiche locali o polling invece di FCM (non arrivano ad app chiusa).
+
+**Limiti**: `getToken`/`onTokenRefresh` sono deprecati in `firebase_messaging` 17 a favore di `register()`/`onRegistered` (Firebase Installation ID): restano finché l'invio HTTP v1 usato dal backend non è documentato con l'FID.
+
+### ADR-069 — Autenticazione mobile e push FCM senza SDK Google nel backend
+**Decisione**:
+- **Login mobile**: `POST /auth/mobile/{login,refresh,logout}` con il refresh token nel body JSON e mai in cookie. Riusano sessioni, rotazione, rilevamento del riuso, blocco progressivo e audit del web; sono esclusi dal CSRF perché non leggono cookie e richiedono un token che solo l'app possiede.
+- **Registrazioni push** (`push_devices`): legate alla sessione di login. Logout, revoca o scadenza fermano le notifiche senza passaggi aggiuntivi; l'app cancella comunque la registrazione al logout. Il token FCM non è mai restituito né scritto nei log.
+- **Canale `PUSH`**: si aggiunge a `DASHBOARD` ed `EMAIL` con le stesse preferenze (predefinito da `MEDIUM`) e la stessa coda con ritentativi (ADR-067). Una consegna push nasce solo se FCM è configurato e l'utente ha un'app collegata.
+- **Contenuto**: titolo dell'alert nella lingua del dispositivo e nome dell'abitazione; nei dati solo `alertId`, `homeId`, `type`. Nessun IP, nessuna evidenza.
+- **Client FCM**: API HTTP v1 implementata con il JDK (`HttpClient`, firma RS256 dell'assertion OAuth del service account, token in cache). Nessuna dipendenza Google aggiunta. Disattivato senza `SHSC_FCM_PROJECT_ID` e `SHSC_FCM_CREDENTIALS_FILE`.
+
+**Motivazione**: un cookie `SameSite=Strict` non è adatto a un client nativo, e docs/06 prevedeva già il body. Il Firebase Admin SDK porterebbe decine di dipendenze transitive per una sola chiamata HTTP. Legare il push alla sessione evita notifiche su un telefono da cui l'utente è uscito.
+
+**Rivedere quando**: servono topic, invii in blocco o APNs diretto (valutare l'Admin SDK con un nuovo ADR).
+
+### ADR-070 — Integrazione Home Assistant lato agent, in sola lettura; Matter tramite Home Assistant
+**Decisione**:
+- **Lato agent**: Home Assistant è nella LAN, quindi lo contatta l'agent (come i router, `secret_location = AGENT_LOCAL`). URL (solo IP letterale) e token di lunga durata sono salvati in `homeassistant.json`, protetto come la chiave dell'agent. Il backend non riceve mai token né URL completo. Le route `GET/POST /homes/{homeId}/integrations` previste in docs/05 non servono per Home Assistant e non sono state create.
+- **Ambito**: l'IP deve appartenere alle reti autorizzate del job; il backend ricontrolla e scarta.
+- **Sola lettura**: `GET /api/config` (solo `version`) e `POST /api/template` con un template Jinja che legge il registro dispositivi. Nessuna chiamata a servizi, nessuna WebSocket API.
+- **Client HTTP standard Go**: niente proxy, niente redirect, limiti di tempo e dimensione, TLS ≥ 1.2 verificato. Nessuna nuova dipendenza.
+- **Upload**: batch dedicato `homeAssistant`, uno per scansione; tabelle `scan_home_assistant` e `scan_gateway_devices` (V014, RLS).
+- **Matter**: tramite l'integrazione Matter di Home Assistant del proprietario. Un controller proprio è scartato; mDNS passivo rimandato.
+
+**Motivazione**: la REST API con token di lunga durata è il metodo ufficiale e documentato. `/api/template` restituisce il registro dispositivi in una sola richiesta, senza WebSocket né librerie. Tenere il token sull'agent evita di custodire nel cloud una credenziale che dà accesso alla casa.
+
+**Alternative**: WebSocket API (`config/device_registry/list`: più completa, ma serve un client WebSocket, cioè una dipendenza o codice in più); `GET /api/states` (solo entità, niente dispositivi né produttori); token custodito dal backend (scartato: credenziale della casa nel cloud, e il backend non raggiunge la LAN).
+
+**Rivedere quando**: `/api/template` cambia o viene limitato, servono aree o dati di sicurezza di Home Assistant stessa, oppure si aggiunge il discovery Matter via mDNS.
+
+### ADR-071 — Assistente di sicurezza: provider LOCAL deterministico, Ollama opzionale, validazione delle risposte
+**Decisione**:
+- **Porta `AssistantProvider`**: `LOCAL` (predefinito) compone risposte deterministiche dai dati della casa, gratis e offline. `OLLAMA` (opzionale, `SHSC_ASSISTANT_PROVIDER=OLLAMA` + `SHSC_OLLAMA_URL`) chiama un LLM self-hosted con il `HttpClient` del JDK. Nessuna nuova dipendenza.
+- **Solo dati del tenant**: punteggio (ultimo `risk_snapshots`), finding aperti e dispositivi letti con le query del report PDF (stessa RLS), con id `S1`, `F1…`, `D1…`. Testi provenienti dalla LAN ripuliti da caratteri di controllo e link, massimo 160 caratteri.
+- **Validazione**: ogni risposta non LOCAL passa da `GroundingValidator`: citazioni esistenti e obbligatorie, nessun IP, CVE, link o punteggio assente dai dati. Se non passa, o il provider fallisce, si mostra la risposta LOCAL con `fallback=true`.
+- **Nessuna azione**: i provider non hanno strumenti; le richieste di azione sono rifiutate con il rimando alla dashboard.
+- **Nessuna memoria**: domande e risposte non sono salvate; l'audit `ASSISTANT_QUERY` registra provider, fallback, lunghezza della domanda e numero di citazioni, mai il testo.
+- **Provider cloud** (es. Claude API): non incluso. Ha un costo e invierebbe dati della casa a terzi; servirà un ADR dedicato con l'SDK ufficiale e la decisione sui costi.
+
+**Motivazione**: il vincolo "nessun servizio a pagamento" e la richiesta di risposte solo dai dati del tenant. Una risposta deterministica è verificabile al 100%; un LLM resta utile per domande libere, ma solo dietro una validazione che ne scarta le invenzioni.
+
+**Alternative**: chiamare subito un LLM cloud (costo, privacy, dipendenza di rete); salvare le conversazioni (dati personali in più senza un requisito); dare strumenti all'LLM (contrario a "nessuna azione").
+
+**Rivedere quando**: si decide un budget per un provider cloud, servono conversazioni multi-turno o le domande libere superano ciò che LOCAL copre.
+
+### ADR-072 — Abbonamenti con Stripe Checkout/Billing Portal via REST, stato solo da webhook firmati; white label per piano
+**Decisione**:
+- **Nessun SDK Stripe**: tre chiamate REST form-encoded (`/v1/customers`, `/v1/checkout/sessions`, `/v1/billing_portal/sessions`) con il `HttpClient` del JDK. Niente redirect né proxy; nei log solo tipo e codice dell'errore Stripe. Nessuna nuova dipendenza.
+- **Pagamento ospitato da Stripe**: la dashboard riceve solo l'URL di Checkout o del Portal, accettato solo se `https://checkout.stripe.com` o `https://billing.stripe.com`. Dati di carta e fatture restano in Stripe.
+- **Stato solo da webhook**: firma `Stripe-Signature` HMAC-SHA256 verificata sul corpo grezzo, con tolleranza di 5 minuti. Eventi idempotenti (`stripe_webhook_events`), ordinati per `created` (`STALE` se più vecchi dell'ultimo applicato). Il tenant si ricava solo dal `customer` salvato al checkout, tramite `billing_lookup_tenant` (SECURITY DEFINER), mai da metadati o `client_reference_id`. Elaborazione in una transazione del tenant (RLS) con lock della riga della sottoscrizione. Dalla M18 anche `stripe_webhook_events` è sotto RLS (V017): il controllo di idempotenza avviene già nell'ambito del tenant del customer.
+- **Piano effettivo**: `tenants.plan_code` = piano del Price se lo stato è `active`, `trialing` o `past_due` e il piano è ammesso per il tipo di tenant; altrimenti FREE. `past_due` dà la tolleranza durante i tentativi di Stripe solo se la sottoscrizione è già stata pagata almeno una volta (`has_paid`): un primo pagamento fallito a fine prova applica subito FREE. Il downgrade non cancella nulla: `PlanLimits` blocca solo le nuove risorse.
+- **Doppio checkout (M18)**: checkout dello stesso tenant serializzati dal lock sulla riga della sottoscrizione; prima della nuova sessione si interroga Stripe (`GET /v1/subscriptions`, permesso Subscriptions in lettura) e si fanno scadere le Checkout Session aperte. Una seconda sottoscrizione arrivata comunque non sostituisce quella corrente non terminata (`IGNORED`, audit `duplicate=true`).
+- **Prova gratuita**: `SHSC_STRIPE_TRIAL_DAYS` (0–730, predefinito 0), gestita da Stripe (`trial_period_days`, carta raccolta al checkout, `missing_payment_method=cancel`). Una sola prova per tenant: offerta finché il tenant non ha avuto una sottoscrizione (`trial_used`, V016). Un checkout abbandonato non la consuma.
+- **Sicurezza operativa**: solo chiavi `sk_test_`/`rk_test_` salvo `SHSC_STRIPE_ALLOW_LIVE=true`; gli eventi `livemode` sono ignorati se non ammessi. Senza chiavi la funzione è disattivata. Nuovo permesso `billing:manage` (ORGANIZATION_ADMIN, CUSTOMER), solo a livello tenant.
+- **White label**: `tenant_branding` (RLS), applicato solo se `plans.white_label` (PRO): header della dashboard (nome, `--primary`, logo come data URL compatibile con la CSP) e intestazione/creator dei PDF. Logo solo PNG/JPEG con magic bytes coerenti, header letto senza decodifica completa (max 2048×2048), niente SVG; servito con `nosniff` e CSP `sandbox`.
+
+**Motivazione**: Checkout e Billing Portal tengono il progetto fuori dall'ambito PCI dei dati di carta e non richiedono UI di pagamento proprie. Usare il webhook come unica fonte evita che un redirect manipolato attivi un piano. Ricavare il tenant dal customer salvato impedisce a un evento di toccare un'altra organizzazione. L'SDK Java di Stripe sarebbe una dipendenza grande per tre chiamate.
+
+**Alternative**: SDK `stripe-java` (dipendenza e aggiornamenti di versione API); Stripe Elements nella dashboard (più codice e più superficie PCI); attivare il piano al ritorno da Checkout (falsificabile); tenant dai metadati dell'evento (un metadato errato colpirebbe un altro tenant).
+
+**Rivedere quando**: servono più prezzi per piano (mensile/annuale), quantità o fatturazione a consumo, un'area amministrativa dei piani, white label su e-mail e app mobile, oppure si passa a chiavi live.
+
+### ADR-073 — Firma delle release dell'agent con Ed25519 della libreria standard Go
+**Stato**: Proposta (M18)
+
+**Decisione**: il manifest `SHA256SUMS` di ogni build dell'agent è firmato con Ed25519 dal comando `shsc-release-sign` (nuovo `cmd/` dell'agent, solo `crypto/ed25519` della libreria standard: nessuna nuova dipendenza). `build-agent.sh` firma se `SHSC_RELEASE_KEY_FILE` indica la chiave privata; altrimenti avvisa che la build non è firmata. La chiave privata resta offline (mai in git né nei container di build oltre al mount in sola lettura); la chiave pubblica è pubblicata con la documentazione. Il binario `shsc-release-sign` per Windows, Linux e macOS è incluso nella release per la verifica (`verify release.pub SHA256SUMS`, poi `sha256sum -c`).
+
+**Motivazione**: l'utente installa l'agent con privilegi di rete nella propria LAN: deve poter verificare che i file vengano dal progetto. Authenticode e notarizzazione Apple richiedono certificati a pagamento, esclusi dal vincolo "nessun servizio a pagamento".
+
+**Alternative**: minisign/cosign/GPG (nuovi strumenti esterni da installare per chi verifica); Authenticode/notarizzazione (a pagamento); solo SHA256SUMS (non protegge da un manifest sostituito insieme ai binari).
+
+**Conseguenze**: Windows SmartScreen e macOS Gatekeeper continueranno ad avvisare sui binari non firmati con certificato di piattaforma. La verifica è manuale finché non esiste un aggiornamento automatico dell'agent.
+
+**Rivedere quando**: c'è un budget per certificati di firma del codice o si introduce l'aggiornamento automatico dell'agent (che dovrà verificare la firma prima di installare).

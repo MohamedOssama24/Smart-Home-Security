@@ -19,6 +19,14 @@ public final class Permissions {
     public static final String CUSTOMER_MANAGE = "customer:manage";
     public static final String NETWORK_MANAGE = "network:manage";
     public static final String NETWORK_AUTHORIZE = "network:authorize";
+    public static final String SCAN_READ = "scan:read";
+    public static final String SCAN_CREATE = "scan:create";
+    public static final String DEVICE_READ = "device:read";
+    public static final String DEVICE_CLASSIFY = "device:classify";
+    public static final String FINDING_READ = "finding:read";
+    public static final String FINDING_TRIAGE = "finding:triage";
+    public static final String REPORT_GENERATE = "report:generate";
+    public static final String BILLING_MANAGE = "billing:manage";
 
     private Permissions() {
     }

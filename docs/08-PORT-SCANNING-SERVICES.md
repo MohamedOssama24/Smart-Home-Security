@@ -1,5 +1,7 @@
 # 08 — Port Scanning, Service & Protocol Detection
 
+> **Implementazione (M9)**: vedi [18-PORT-SCANNING.md](18-PORT-SCANNING.md). Differenze: solo le porte aperte sono salvate (le altre come contatori, ADR-049), liste nell'agent (ADR-050), `DEEP`/`CUSTOM` rimandati alla M17 (ADR-051), timeout fisso (ADR-052), SMB senza 3.1.1 (ADR-053), test MQTT anonimo non implementato (ADR-012).
+
 ## 1. TCP scanner
 - Tecnica: **TCP connect** (`net.Dialer{Timeout}` con `DialContext`), nessun raw SYN scan (niente pcap/privilegi, comportamento più gentile verso i dispositivi).
 - Stati:

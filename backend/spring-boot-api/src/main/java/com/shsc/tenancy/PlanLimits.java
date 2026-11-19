@@ -14,16 +14,16 @@ import com.shsc.tenancy.TenantRepository.Tenant;
  * Limits of the tenant's plan (only FREE exists until the SaaS milestone). Every check
  * locks the tenant row first, so concurrent creations are serialized and cannot exceed a
  * limit together. Must be called inside the transaction that creates the resource.
- * Archived homes/customers and disabled users do not count.
+ * Archived homes/customers, disabled users and revoked agents do not count.
  */
 @Component
 public class PlanLimits {
 
-    public enum Resource { HOMES, USERS, CUSTOMERS, NETWORKS_PER_HOME }
+    public enum Resource { HOMES, USERS, CUSTOMERS, NETWORKS_PER_HOME, AGENTS_PER_HOME, SCANS_PER_DAY }
 
     /** Limits of a plan; {@code null} means unlimited. */
     public record Plan(String code, Integer maxHomes, Integer maxUsers, Integer maxCustomers,
-            Integer maxNetworksPerHome) {
+            Integer maxNetworksPerHome, Integer maxAgentsPerHome, Integer maxScansPerDay) {
 
         Integer max(Resource resource) {
             return switch (resource) {
@@ -31,6 +31,8 @@ public class PlanLimits {
                 case USERS -> maxUsers;
                 case CUSTOMERS -> maxCustomers;
                 case NETWORKS_PER_HOME -> maxNetworksPerHome;
+                case AGENTS_PER_HOME -> maxAgentsPerHome;
+                case SCANS_PER_DAY -> maxScansPerDay;
             };
         }
     }
@@ -48,12 +50,14 @@ public class PlanLimits {
 
     public Plan planOf(Tenant tenant) {
         return jdbc.sql("""
-                SELECT code, max_homes, max_users, max_customers, max_networks_per_home
+                SELECT code, max_homes, max_users, max_customers, max_networks_per_home, max_agents_per_home, max_scans_per_day
                 FROM plans WHERE code = :code""")
                 .param("code", tenant.planCode())
                 .query((rs, n) -> new Plan(rs.getString("code"), rs.getObject("max_homes", Integer.class),
                         rs.getObject("max_users", Integer.class), rs.getObject("max_customers", Integer.class),
-                        rs.getObject("max_networks_per_home", Integer.class)))
+                        rs.getObject("max_networks_per_home", Integer.class),
+                        rs.getObject("max_agents_per_home", Integer.class),
+                        rs.getObject("max_scans_per_day", Integer.class)))
                 .single();
     }
 
@@ -63,7 +67,7 @@ public class PlanLimits {
 
     /**
      * Throws 409 {@code PLAN_LIMIT_REACHED} when adding one more {@code resource} would exceed
-     * the plan. {@code homeId} is required for {@link Resource#NETWORKS_PER_HOME}.
+     * the plan. {@code homeId} is required for the per-home resources.
      */
     public void requireCapacity(Resource resource, UUID homeId) {
         Tenant tenant = tenants.lockCurrent().orElseThrow(ApiException::notFound);
@@ -81,9 +85,12 @@ public class PlanLimits {
             case USERS -> "SELECT count(*) FROM users WHERE status <> 'DISABLED'";
             case CUSTOMERS -> "SELECT count(*) FROM customers WHERE archived_at IS NULL";
             case NETWORKS_PER_HOME -> "SELECT count(*) FROM networks WHERE home_id = :home";
+            case AGENTS_PER_HOME -> "SELECT count(*) FROM agents WHERE home_id = :home AND status = 'ACTIVE'";
+            // manual scans of the home in the last 24 hours (rolling window)
+            case SCANS_PER_DAY -> "SELECT count(*) FROM scans WHERE home_id = :home AND requested_at > now() - interval '1 day'";
         };
         var statement = jdbc.sql(sql);
-        if (resource == Resource.NETWORKS_PER_HOME) {
+        if (homeId != null) {
             statement = statement.param("home", homeId);
         }
         return statement.query(Integer.class).single();

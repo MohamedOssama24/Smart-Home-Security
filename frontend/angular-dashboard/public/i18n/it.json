@@ -3,16 +3,23 @@
     "name": "Smart Home Security Check",
     "language": "Lingua",
     "navigation": "Navigazione principale",
-    "languages": { "it": "Italiano", "en": "English" }
+    "languages": {
+      "it": "Italiano",
+      "en": "English"
+    }
   },
   "nav": {
+    "billing": "Abbonamento",
     "homes": "Abitazioni",
     "customers": "Clienti",
     "users": "Utenti",
     "organization": "Organizzazione",
     "account": "Account",
     "status": "Stato sistema",
-    "logout": "Esci"
+    "logout": "Esci",
+    "overview": "Panoramica",
+    "menu": "Menu",
+    "alerts": "Avvisi"
   },
   "systemStatus": {
     "title": "Stato del sistema",
@@ -141,7 +148,13 @@
     "cidr": "Intervallo (CIDR)",
     "cidrHint": "Solo reti private IPv4 (10.x, 172.16-31.x, 192.168.x, /22 o più piccole) o IPv6 locali (fc00::/7, fe80::/10, prefisso /64 o più piccolo).",
     "kindLabel": "Tipo",
-    "kind": { "WIFI": "Wi-Fi", "ETHERNET": "Cablata", "VLAN": "VLAN", "GUEST": "Ospiti", "UNKNOWN": "Non specificato" },
+    "kind": {
+      "WIFI": "Wi-Fi",
+      "ETHERNET": "Cablata",
+      "VLAN": "VLAN",
+      "GUEST": "Ospiti",
+      "UNKNOWN": "Non specificato"
+    },
     "authorization": "Autorizzazione",
     "authorized": "Autorizzata",
     "notAuthorized": "Non autorizzata",
@@ -178,7 +191,9 @@
       "customers": "Clienti",
       "networksPerHome": "Reti per abitazione",
       "unlimited": "illimitato",
-      "note": "I limiti valgono per le nuove creazioni; utenti disattivati e elementi archiviati non vengono conteggiati."
+      "note": "I limiti valgono per le nuove creazioni; utenti disattivati e elementi archiviati non vengono conteggiati.",
+      "agentsPerHome": "Agent per abitazione",
+      "scansPerDay": "Scansioni manuali per abitazione (24 ore)"
     },
     "details": {
       "title": "Dati dell'organizzazione",
@@ -240,7 +255,9 @@
     "cancel": "Annulla",
     "delete": "Elimina",
     "archive": "Archivia",
-    "confirmArchive": "Sì, archivia"
+    "confirmArchive": "Sì, archivia",
+    "yes": "Sì",
+    "no": "No"
   },
   "agents": {
     "title": "Agent locali",
@@ -253,8 +270,16 @@
     "revokeConfirm": "L'agent dovrà essere registrato di nuovo. Confermi?",
     "revokeConfirmYes": "Sì, revoca",
     "revokeCancel": "Annulla",
-    "state": { "ACTIVE": "Attivo", "REVOKED": "Revocato" },
-    "tokenState": { "ACTIVE": "Valido", "USED": "Usato", "EXPIRED": "Scaduto", "REVOKED": "Revocato" },
+    "state": {
+      "ACTIVE": "Attivo",
+      "REVOKED": "Revocato"
+    },
+    "tokenState": {
+      "ACTIVE": "Valido",
+      "USED": "Usato",
+      "EXPIRED": "Scaduto",
+      "REVOKED": "Revocato"
+    },
     "enroll": {
       "title": "Collega un agent",
       "description": "Genera un codice monouso e usalo per registrare l'agent installato su un computer di questa rete. Il codice scade dopo 30 minuti.",
@@ -263,10 +288,716 @@
       "command": "Salvalo in un file (es. token.txt) ed esegui sul computer dell'agent:",
       "createdAt": "Creato",
       "expiresAt": "Scadenza",
-      "revoke": "Annulla"
+      "revoke": "Annulla",
+      "service": "Poi installalo come servizio (da amministratore):"
+    },
+    "connectivity": {
+      "ONLINE": "Online",
+      "STALE": "Non aggiornato",
+      "OFFLINE": "Offline",
+      "NEVER_CONNECTED": "Mai collegato",
+      "REVOKED": "Revocato"
+    },
+    "diagnosis": {
+      "show": "Diagnostica",
+      "hide": "Chiudi",
+      "arp": "Rilevamento ARP",
+      "icmp": "Ping (ICMP)",
+      "privileged": "Privilegi elevati",
+      "queue": "Messaggi in coda",
+      "router": "Integrazioni router",
+      "noRouter": "Nessuna (configurabili sull'agent con 'shsc-agent router')",
+      "interfaces": "Interfacce di rete",
+      "noInterfaces": "Nessuna interfaccia di rete utilizzabile.",
+      "noHeartbeat": "L'agent non ha ancora inviato la sua diagnostica. Avvialo con il servizio.",
+      "lastError": "Ultimo errore",
+      "events": "Eventi recenti",
+      "noEvents": "Nessun evento."
+    },
+    "technique": {
+      "raw": "Completo (socket raw)",
+      "unprivileged": "Senza privilegi",
+      "os_api": "API di sistema",
+      "os_table": "Solo tabella del sistema",
+      "unavailable": "Non disponibile"
+    },
+    "warning": {
+      "ARP_TABLE_ONLY": "L'agent legge solo i dispositivi già noti al sistema: alcuni dispositivi potrebbero non essere rilevati.",
+      "ARP_UNAVAILABLE": "Il rilevamento ARP non è disponibile: la copertura della rete sarà ridotta.",
+      "ICMP_UNAVAILABLE": "Il ping (ICMP) non è disponibile: i dispositivi che rispondono solo al ping non saranno rilevati.",
+      "NO_USABLE_INTERFACE": "Il computer dell'agent non ha interfacce di rete attive utilizzabili."
+    },
+    "event": {
+      "AGENT_STARTED": "Agent avviato",
+      "AGENT_STOPPED": "Agent arrestato",
+      "CAPABILITIES_CHANGED": "Capacità cambiate",
+      "CONNECTION_RESTORED": "Connessione ripristinata",
+      "QUEUE_OVERFLOW": "Coda locale piena: messaggi persi"
+    }
+  },
+  "scans": {
+    "title": "Scansioni",
+    "backToHome": "Torna all'abitazione",
+    "description": "Avvia manualmente una scansione delle reti autorizzate di questa abitazione. L'agent cerca quali dispositivi sono presenti (ARP, ping, mDNS, SSDP/UPnP, NetBIOS, DNS inverso, IPv6 e, se configurate sull'agent, le integrazioni con il router): nessuna scansione delle porte, nessuna credenziale provata. Le scansioni non partono mai in automatico.",
+    "start": "Avvia scansione",
+    "cancel": "Annulla scansione",
+    "cancelRequested": "Annullamento richiesto…",
+    "devicesFound": "Dispositivi trovati: {{count}}",
+    "detail": "Risultato",
+    "history": "Storico",
+    "empty": "Nessuna scansione eseguita.",
+    "show": "Dettaglio",
+    "ip": "Indirizzo IP",
+    "mac": "MAC",
+    "method": "Rilevato con",
+    "noDevices": "Nessun dispositivo rilevato.",
+    "devicesNote": "Elenco degli indirizzi in uso osservati sulle reti autorizzate: non indica vulnerabilità. Gli indirizzi con lo stesso MAC sono raggruppati.",
+    "name": "Nome",
+    "declared": "Informazioni dichiarate",
+    "selfDeclared": "Dichiarato dal dispositivo, non verificato.",
+    "portMappings": "Il router dichiara {{count}} inoltri di porte verso Internet (UPnP):",
+    "disabled": "disattivato",
+    "status": {
+      "PENDING": "In preparazione",
+      "QUEUED": "In attesa dell'agent",
+      "RUNNING": "In corso",
+      "COMPLETED": "Completata",
+      "COMPLETED_WITH_WARNINGS": "Completata con avvisi",
+      "FAILED": "Non riuscita",
+      "CANCELLED": "Annullata"
+    },
+    "reason": {
+      "AGENT_OFFLINE": "L'agent non era raggiungibile.",
+      "AGENT_LOST": "L'agent ha smesso di rispondere durante la scansione.",
+      "TIMEOUT": "Superata la durata massima.",
+      "AGENT_REVOKED": "L'agent è stato revocato.",
+      "AGENT_ABORTED": "L'agent ha interrotto la scansione.",
+      "USER_CANCELLED": "Annullata dall'utente."
+    },
+    "warning": {
+      "TARGET_NOT_CONNECTED": "Una rete autorizzata non è collegata direttamente al computer dell'agent: non è stata analizzata.",
+      "IPV6_NOT_SUPPORTED": "Le reti IPv6 non sono ancora analizzate.",
+      "HOST_LIMIT_REACHED": "Raggiunto il numero massimo di indirizzi per scansione: risultati parziali.",
+      "ARP_TABLE_ONLY": "L'agent non ha i permessi per inviare richieste ARP: sono stati letti solo i dispositivi già noti al sistema.",
+      "ARP_UNAVAILABLE": "ARP non disponibile su questo sistema operativo.",
+      "INTERFACE_WITHOUT_ARP": "L'interfaccia di rete non supporta ARP.",
+      "ARP_ERROR": "Alcune richieste ARP non sono state inviate.",
+      "OUT_OF_SCOPE_RESULTS": "Alcuni risultati fuori dalle reti autorizzate sono stati scartati.",
+      "LATE_UPLOAD": "I risultati sono arrivati dopo che l'agent era stato considerato non raggiungibile.",
+      "ICMP_UNAVAILABLE": "Il ping (ICMP) non è disponibile: i dispositivi che rispondono solo al ping non sono stati rilevati.",
+      "MDNS_UNAVAILABLE": "mDNS non disponibile: i servizi annunciati dai dispositivi non sono stati letti.",
+      "SSDP_UNAVAILABLE": "SSDP/UPnP non disponibile: le descrizioni dei dispositivi UPnP non sono state lette.",
+      "NETBIOS_UNAVAILABLE": "NetBIOS non disponibile: i nomi dei computer Windows non sono stati letti.",
+      "NDP_TABLE_ONLY": "IPv6: letti solo i vicini già noti al sistema.",
+      "NDP_UNAVAILABLE": "IPv6: rilevamento non disponibile su questo sistema.",
+      "ROUTER_OUT_OF_SCOPE": "L'indirizzo del router configurato sull'agent non appartiene alle reti autorizzate: non è stato contattato.",
+      "ROUTER_AUTH_FAILED": "Il router ha rifiutato le credenziali configurate sull'agent: integrazione interrotta senza altri tentativi.",
+      "ROUTER_UNREACHABLE": "Il router non ha risposto all'integrazione configurata sull'agent.",
+      "HA_OUT_OF_SCOPE": "Home Assistant non è in una rete autorizzata dell'abitazione: non è stato contattato.",
+      "HA_UNREACHABLE": "Home Assistant non ha risposto (rete, timeout o certificato HTTPS non valido).",
+      "HA_AUTH_FAILED": "Home Assistant ha rifiutato il token: crea un nuovo token di lunga durata e riconfigura l'agent.",
+      "HA_INVALID_RESPONSE": "Risposta inattesa da Home Assistant: inventario non letto.",
+      "HA_PLAIN_HTTP": "Home Assistant è raggiunto in HTTP non cifrato: il token viaggia in chiaro sulla rete locale.",
+      "HA_INVENTORY_TRUNCATED": "Home Assistant ha più di 500 dispositivi: inventario troncato.",
+      "PORT_SCAN_HOST_PAUSED": "Un dispositivo ha smesso di rispondere durante il controllo delle porte: per non sovraccaricarlo il controllo è stato sospeso, i risultati sono parziali.",
+      "PORT_SCAN_OUT_OF_SCOPE": "Un dispositivo fuori dalle reti autorizzate collegate all'agent non è stato controllato.",
+      "PORT_SCAN_INCOMPLETE": "Il controllo delle porte non è terminato (scansione annullata o tempo massimo raggiunto): risultati parziali."
+    },
+    "methods": {
+      "ARP": "ARP",
+      "SELF": "Computer dell'agent",
+      "ICMP": "Ping",
+      "MDNS": "mDNS",
+      "SSDP": "SSDP/UPnP",
+      "UPNP_IGD": "Gateway UPnP",
+      "NETBIOS": "NetBIOS",
+      "RDNS": "DNS inverso",
+      "NDP": "IPv6 (NDP)",
+      "TR064": "Router (TR-064)",
+      "SNMP": "Router (SNMP)",
+      "PORTSCAN": "Porte"
+    },
+    "profile": "Tipo di scansione",
+    "profiles": {
+      "DISCOVERY": "Rilevamento dispositivi",
+      "QUICK": "Rapida (porte principali)",
+      "STANDARD": "Standard (porte comuni)"
+    },
+    "profileHint": {
+      "DISCOVERY": "Trova i dispositivi collegati alle reti autorizzate, senza controllare le porte.",
+      "QUICK": "Trova i dispositivi e controlla circa 40 porte TCP e 6 servizi UDP molto diffusi. Solo richieste di lettura: nessun accesso, nessuna password provata.",
+      "STANDARD": "Trova i dispositivi e controlla circa 300 porte TCP e 8 servizi UDP. Richiede più tempo; solo richieste di lettura, nessun accesso, nessuna password provata."
+    },
+    "phase": {
+      "PREPARING": "preparazione",
+      "INTERFACES": "interfacce di rete",
+      "DISCOVERY": "ricerca dispositivi",
+      "PORTS": "controllo porte e servizi",
+      "UPLOADING": "invio risultati"
+    }
+  },
+  "devices": {
+    "title": "Dispositivi",
+    "backToHome": "Torna all'abitazione",
+    "devicesLink": "Dispositivi",
+    "description": "Inventario costruito dalle scansioni. Tipo, produttore e sistema operativo sono stime con un livello di affidabilità e le fonti da cui derivano: un solo indizio debole non basta mai, in quel caso il dispositivo resta \"non identificato\". Puoi correggere la categoria a mano: la tua scelta non viene mai sovrascritta.",
+    "empty": "Nessun dispositivo: avvia una scansione per costruire l'inventario.",
+    "name": "Nome",
+    "category": "Categoria",
+    "ip": "IP",
+    "mac": "MAC",
+    "manufacturer": "Produttore",
+    "lastSeen": "Visto il",
+    "show": "Dettagli",
+    "manual": "manuale",
+    "randomized": "MAC casuale",
+    "randomizedNote": "Il dispositivo usa un indirizzo MAC casuale (privacy): può cambiare nel tempo e il produttore non è ricavabile dal MAC.",
+    "probableSameAs": "Probabilmente è lo stesso dispositivo di \"{{name}}\".",
+    "overall": "Affidabilità complessiva",
+    "suggestion": "Le ultime scansioni indicano con buona affidabilità la categoria \"{{category}}\": la tua scelta manuale resta valida finché non la cambi.",
+    "setCategory": "Categoria",
+    "automatic": "Automatica",
+    "identified": "Cosa è stato identificato",
+    "conflict": "fonti in disaccordo",
+    "disagrees": "in disaccordo",
+    "why": "Perché questa categoria",
+    "ruleset": "Regole di classificazione versione {{version}}.",
+    "history": "Storico della categoria",
+    "changeSource": {
+      "AUTO": "Rilevata",
+      "MANUAL": "Manuale"
+    },
+    "confidence": {
+      "LOW": "bassa",
+      "MEDIUM": "media",
+      "HIGH": "alta"
+    },
+    "strength": {
+      "STRONG": "indizio forte",
+      "MODERATE": "indizio medio",
+      "WEAK": "indizio debole"
+    },
+    "categories": {
+      "ROUTER": "Router",
+      "IP_CAMERA": "Videocamera IP",
+      "SMART_TV": "Smart TV",
+      "SMARTPHONE": "Smartphone",
+      "TABLET": "Tablet",
+      "LAPTOP": "Portatile",
+      "DESKTOP": "Computer fisso",
+      "PRINTER": "Stampante",
+      "NAS": "NAS",
+      "SMART_PLUG": "Presa smart",
+      "SMART_SPEAKER": "Altoparlante smart",
+      "IOT": "Dispositivo IoT",
+      "UNKNOWN_DEVICE": "Non identificato"
+    },
+    "fields": {
+      "IP": "Indirizzo IP",
+      "MAC": "Indirizzo MAC",
+      "HOSTNAME": "Nome",
+      "MANUFACTURER": "Produttore",
+      "MODEL": "Modello",
+      "OS": "Sistema operativo",
+      "FIRMWARE": "Firmware",
+      "DEVICE_TYPE": "Tipo di dispositivo"
+    }
+  },
+  "integrations": {
+    "homeAssistant": "Home Assistant",
+    "instance": "Istanza {{ip}}, versione {{version}}, {{count}} dispositivi.",
+    "plainHttp": "HTTP non cifrato: il token di Home Assistant viaggia in chiaro sulla rete locale. Configura HTTPS.",
+    "truncated": "Inventario troncato ai primi 500 dispositivi.",
+    "model": "Produttore e modello",
+    "protocolLabel": "Protocollo",
+    "matchedIp": "Indirizzo nella scansione",
+    "note": "Dati letti da Home Assistant con il token del proprietario (sola lettura) e dichiarati dalle integrazioni: non verificati dalla scansione. I dispositivi Zigbee, Z-Wave, Thread e Bluetooth non hanno indirizzo IP.",
+    "protocol": {
+      "ZIGBEE": "Zigbee",
+      "ZWAVE": "Z-Wave",
+      "MATTER": "Matter",
+      "THREAD": "Thread",
+      "BLUETOOTH": "Bluetooth",
+      "IP": "IP",
+      "OTHER": "Altro"
+    }
+  },
+  "ports": {
+    "title": "Porte aperte e servizi",
+    "none": "Nessuna porta aperta tra quelle controllate.",
+    "notScanned": "Le porte di questo dispositivo non sono ancora state controllate: avvia una scansione Rapida o Standard.",
+    "ip": "Indirizzo",
+    "port": "Porta",
+    "service": "Servizio",
+    "product": "Prodotto / versione",
+    "details": "Dettagli",
+    "status": {
+      "PROBABLE": "probabile",
+      "CONFIRMED": "confermato"
+    },
+    "evidence": {
+      "title": "Titolo della pagina: {{value}}",
+      "server": "Server dichiarato: {{value}}",
+      "dialect": "Versione SMB: {{value}}",
+      "authRequired": "Richiede autenticazione",
+      "loginForm": "Pagina di accesso",
+      "redirectsToHttps": "Reindirizza a HTTPS",
+      "smb1": "Accetta SMB1 (protocollo obsoleto)",
+      "signingNotRequired": "Firma SMB non obbligatoria",
+      "tlsVersions": "Versioni TLS: {{value}}",
+      "tlsExpired": "Certificato scaduto",
+      "tlsSelfSigned": "Certificato autofirmato"
+    },
+    "declaredNote": "\"Probabile\": servizio dedotto dal numero di porta. \"Confermato\": il dispositivo ha risposto al protocollo. Prodotto, versione e titoli sono dichiarati dal dispositivo e non verificati.",
+    "summary": "porte controllate: {{tcp}} TCP e {{udp}} UDP · aperte {{open}} · chiuse {{closed}} · senza risposta {{silent}}",
+    "protocols": "Protocolli rilevati"
+  },
+  "overview": {
+    "title": "Panoramica",
+    "description": "Lo stato di sicurezza delle tue abitazioni, dalla più a rischio. Il punteggio è quello dell'ultima scansione Rapida o Standard.",
+    "noHomes": "Nessuna abitazione.",
+    "toHomes": "Aggiungi un'abitazione",
+    "summary": {
+      "homes": "abitazioni",
+      "atRisk": "a rischio alto o critico",
+      "critical": "problemi critici o alti",
+      "kev": "vulnerabilità sfruttate attivamente",
+      "unscored": "senza punteggio"
+    },
+    "provisional": "Provvisorio (copertura bassa)",
+    "noScore": "Nessun punteggio: esegui una scansione Rapida o Standard.",
+    "notComputed": "L'ultima scansione (Solo rilevamento) non ha aggiornato il punteggio.",
+    "noFindings": "Nessun problema aperto",
+    "devices": "{{count}} dispositivi",
+    "lastScan": "Ultima scansione",
+    "neverScanned": "Mai scansionata",
+    "restricted": "Non hai i permessi per vedere lo stato di sicurezza di questa abitazione."
+  },
+  "vulnerabilities": {
+    "title": "Vulnerabilità note (CVE)",
+    "description": "Le CVE associate ai dispositivi dell'abitazione dall'analisi di sicurezza, prima quelle sfruttate attivamente (KEV), poi per punteggio CVSS.",
+    "none": "Nessuna vulnerabilità nota associata ai dispositivi.",
+    "kevOnly": "Solo sfruttate attivamente (KEV)",
+    "count": "{{shown}} di {{total}}",
+    "product": "Prodotto",
+    "device": "Dispositivo",
+    "match": "Corrispondenza",
+    "limit": "Sono elencate al massimo 500 CVE di problemi non risolti. Il link apre la scheda della CVE sul sito della NVD."
+  },
+  "networkMap": {
+    "title": "Mappa di rete",
+    "description": "I dispositivi di ogni rete autorizzata intorno al router, colorati in base ai punti che tolgono all'ultimo punteggio. Seleziona un dispositivo per i dettagli.",
+    "noDevices": "Nessun dispositivo: esegui una scansione.",
+    "noRisk": "Nessun punteggio calcolato: i colori del rischio non sono disponibili.",
+    "legend": {
+      "none": "nessun punto tolto",
+      "low": "pochi punti tolti",
+      "high": "molti punti tolti (15 o più)",
+      "exposed": "esposto a Internet (inoltro UPnP)",
+      "score": "Punteggio {{score}}"
+    },
+    "otherDevices": "Dispositivi fuori dalle reti configurate",
+    "routerUnknown": "Router non identificato",
+    "category": "Categoria",
+    "manufacturer": "Produttore",
+    "points": "Punti tolti",
+    "findings": "Problemi conteggiati",
+    "lastSeen": "Ultima volta visto",
+    "tableTitle": "Elenco dei dispositivi",
+    "device": "Dispositivo",
+    "network": "Rete",
+    "logicalNote": "Mappa logica: i collegamenti indicano la rete a cui appartiene il dispositivo, non il cablaggio o il Wi-Fi reale, che dalla rete locale non si possono osservare."
+  },
+  "alerts": {
+    "title": "Avvisi",
+    "description": "Cosa è cambiato nelle tue abitazioni: nuovi problemi gravi, problemi risolti, cali del punteggio, nuovi dispositivi, scansioni non riuscite e agent non raggiungibili. Lo stesso evento ripetuto resta un solo avviso con il numero di volte.",
+    "unreadOnly": "Solo da leggere",
+    "unread": "avvisi da leggere",
+    "readAll": "Segna tutti come letti",
+    "markRead": "Segna come letto",
+    "open": "Apri",
+    "none": "Nessun avviso.",
+    "resolved": "Risolto",
+    "occurrences": "Ripetuto {{count}} volte",
+    "severity": {
+      "INFO": "Info",
+      "LOW": "Bassa",
+      "MEDIUM": "Media",
+      "HIGH": "Alta",
+      "CRITICAL": "Critica"
+    },
+    "channel": {
+      "DASHBOARD": "Dashboard",
+      "EMAIL": "Email"
+    },
+    "type": {
+      "NEW_FINDING": "Nuovo problema grave (alta o critica)",
+      "FINDING_RESOLVED": "Problema risolto",
+      "SCORE_DROPPED": "Calo del punteggio di sicurezza",
+      "NEW_DEVICE": "Nuovo dispositivo in rete",
+      "SCAN_FAILED": "Scansione non riuscita",
+      "AGENT_OFFLINE": "Agent non raggiungibile"
+    },
+    "text": {
+      "NEW_FINDING": "Nuovo problema: {{title}}",
+      "FINDING_RESOLVED": "Problema risolto: {{title}}",
+      "SCORE_DROPPED": "Il punteggio è sceso a {{score}}/100 ({{change}} punti)",
+      "NEW_DEVICE": "Nuovo dispositivo in rete: {{name}}",
+      "NEW_DEVICES": "{{count}} nuovi dispositivi in rete",
+      "SCAN_FAILED": "Scansione non riuscita ({{reason}})",
+      "AGENT_OFFLINE": "Agent \"{{name}}\" non raggiungibile da più di 15 minuti"
+    },
+    "preferences": {
+      "title": "Preferenze di notifica",
+      "description": "Scegli quali avvisi ricevere nella dashboard e via email, e da quale gravità.",
+      "type": "Avviso",
+      "enabled": "Attivo",
+      "minSeverity": "Gravità minima",
+      "note": "Le email arrivano all'indirizzo del tuo account. Un avviso ripetuto non invia altre email finché non è risolto. Ricevi solo gli avvisi delle abitazioni che puoi consultare.",
+      "saved": "Preferenze salvate."
+    }
+  },
+  "billing": {
+    "title": "Abbonamento",
+    "currentPlan": "Piano attuale:",
+    "renewsOn": "rinnovo il",
+    "endsOn": "termina il",
+    "trialEndsOn": "prova gratuita fino al",
+    "trialOffer": "Prova gratuita di {{days}} giorni: l'addebito parte alla fine della prova, disdici prima per non pagare.",
+    "disabled": "Gli abbonamenti online non sono attivi su questa installazione.",
+    "subscribe": "Abbonati",
+    "portal": "Gestisci abbonamento e fatture",
+    "note": "Il pagamento avviene su Stripe: i dati della carta non passano da questa dashboard. Il piano si aggiorna appena Stripe conferma il pagamento. Riducendo il piano nessun dato viene cancellato, ma non si possono creare nuove risorse oltre i limiti.",
+    "checkoutSuccess": "Grazie! Il piano si aggiornerà appena Stripe conferma il pagamento (di solito pochi secondi).",
+    "checkoutCancel": "Pagamento annullato: il piano non è cambiato.",
+    "plans": { "FREE": "Free", "PLUS": "Plus", "PRO": "Pro" },
+    "limits": {
+      "homes": "Abitazioni",
+      "users": "Utenti",
+      "customers": "Clienti",
+      "agents": "Agent per abitazione",
+      "scans": "Scansioni al giorno per abitazione",
+      "whiteLabel": "White label (nome, colore e logo, anche nei report PDF)"
+    },
+    "status": {
+      "incomplete": "pagamento incompleto",
+      "incomplete_expired": "pagamento scaduto",
+      "trialing": "in prova",
+      "active": "attivo",
+      "past_due": "pagamento in ritardo",
+      "canceled": "annullato",
+      "unpaid": "non pagato",
+      "paused": "in pausa"
+    }
+  },
+  "branding": {
+    "title": "White label",
+    "unavailable": "Il white label è incluso nel piano Pro.",
+    "displayName": "Nome mostrato",
+    "primaryColor": "Colore principale",
+    "supportEmail": "E-mail di supporto",
+    "save": "Salva",
+    "saved": "Personalizzazione salvata.",
+    "logo": "Logo",
+    "logoHint": "PNG o JPEG, massimo 256 KB e 2048×2048 pixel.",
+    "removeLogo": "Rimuovi logo"
+  },
+  "assistant": {
+    "title": "Assistente di sicurezza",
+    "disclaimer": "Risponde solo con i dati di questa casa (punteggio, problemi, dispositivi) e li cita. Non esegue azioni e non inventa nulla: se un dato manca lo dice. Domande e risposte non vengono salvate.",
+    "question": "La tua domanda",
+    "placeholder": "Per esempio: cosa devo sistemare per primo?",
+    "ask": "Chiedi",
+    "sources": "Fonti:",
+    "kind": {
+      "SCORE": "punteggio",
+      "FINDING": "problema",
+      "DEVICE": "dispositivo"
+    },
+    "provider": "Risposta di: {{provider}}",
+    "fallback": {
+      "NOT_GROUNDED": "la risposta dell'IA non era supportata dai dati: è mostrata la risposta standard",
+      "PROVIDER_UNAVAILABLE": "servizio IA non disponibile: è mostrata la risposta standard"
+    },
+    "dataAsOf": "dati del",
+    "suggest": {
+      "risk": "Qual è il mio punteggio di rischio?",
+      "fix": "Cosa devo sistemare per primo?",
+      "devices": "Quali dispositivi ho?"
+    }
+  },
+  "reports": {
+    "title": "Rapporti PDF",
+    "description": "Un rapporto PDF, comprensibile anche per chi non è un tecnico, con punteggio, copertura, problemi da risolvere, dispositivi trovati e limiti dell'analisi.",
+    "scan": "Scansione",
+    "language": "Lingua",
+    "generate": "Genera rapporto",
+    "noScans": "Nessuna scansione completata: esegui una scansione per generare un rapporto.",
+    "none": "Nessun rapporto generato.",
+    "requestedAt": "Richiesto il",
+    "statusLabel": "Stato",
+    "status": {
+      "PENDING": "In preparazione",
+      "READY": "Pronto",
+      "FAILED": "Non riuscito"
+    },
+    "size": "{{pages}} pagine, {{kb}} KB",
+    "download": "Scarica PDF"
+  },
+  "risk": {
+    "title": "Punteggio di sicurezza",
+    "description": "Da 0 a 100 (100 = nessun problema noto). Il punteggio dipende da ciò che le scansioni hanno potuto controllare: per questo è sempre mostrato insieme alla copertura.",
+    "backToHome": "Torna alla casa",
+    "noScan": "Nessun punteggio: esegui una scansione Rapida o Standard.",
+    "notComputed": {
+      "PORT_SCAN_REQUIRED": "L'ultima scansione (Solo rilevamento) non controlla porte e servizi: il punteggio non è stato calcolato. Esegui una scansione Rapida o superiore."
+    },
+    "showingLast": "Sotto c'è l'ultimo punteggio calcolato.",
+    "computedAt": "Calcolato il",
+    "profile": "Scansione",
+    "trigger": {
+      "SCAN": "Dopo una scansione",
+      "TRIAGE": "Dopo la gestione di un problema"
+    },
+    "level": {
+      "LOW": "Rischio basso",
+      "MEDIUM": "Rischio medio",
+      "HIGH": "Rischio alto",
+      "CRITICAL": "Rischio critico"
+    },
+    "rating": {
+      "EXCELLENT": "Ottimo",
+      "GOOD": "Buono",
+      "FAIR": "Discreto",
+      "POOR": "Scarso",
+      "CRITICAL": "Critico"
+    },
+    "provisional": "Punteggio provvisorio: la scansione ha controllato poco della rete, quindi il punteggio è limitato a {{cap}} (senza limite sarebbe {{uncapped}}). Non trovare problemi non significa che non ci siano.",
+    "delta": {
+      "change": "{{change}} punti rispetto al punteggio precedente ({{previous}}).",
+      "title": "Cosa è cambiato",
+      "none": "Nessun cambiamento nei problemi conteggiati.",
+      "new": "Nuovi problemi conteggiati ({{count}})",
+      "removed": "Problemi non più conteggiati ({{count}})",
+      "devices": "Nuovi dispositivi ({{count}})",
+      "status": {
+        "RESOLVED": "risolto (non più rilevato)",
+        "FALSE_POSITIVE": "segnato come falso positivo",
+        "ACCEPTED_RISK": "rischio accettato",
+        "OPEN": "aperto",
+        "ACKNOWLEDGED": "preso in carico",
+        "REMOVED": "dispositivo rimosso"
+      }
+    },
+    "coverage": {
+      "title": "Copertura",
+      "description": "Quanto della rete la scansione ha potuto controllare: dispositivi analizzati, profilo, tecniche di rilevamento riuscite e integrazione con il router.",
+      "hosts": "Dispositivi analizzati: {{analyzed}} su {{discovered}}",
+      "depth": "Profilo: {{profile}}",
+      "techniques": "Tecniche di rilevamento",
+      "routerYes": "Integrazione router: disponibile",
+      "routerNo": "Integrazione router: non configurata",
+      "hint": "Con una copertura sotto l'80% il giudizio non può essere \"Ottimo\": una scansione Standard e l'integrazione con il router la aumentano."
+    },
+    "why": {
+      "title": "Perché questo punteggio?",
+      "formula": "Ogni problema toglie punti: gravità × tipo × affidabilità × importanza del dispositivo × esposizione a Internet × sfruttamento attivo (KEV). Un singolo dispositivo toglie al massimo 45 punti.",
+      "none": "Nessun problema conteggiato.",
+      "finding": "Problema",
+      "device": "Dispositivo",
+      "factors": "Fattori",
+      "points": "Punti",
+      "more": "Altri {{count}} problemi non mostrati.",
+      "capped": "Per almeno un dispositivo i punti tolti sono stati limitati a {{cap}}.",
+      "notScored": "{{count}} informazioni da verificare non tolgono punti."
+    },
+    "excluded": {
+      "title": "Esclusi dal punteggio (falsi positivi e rischi accettati)"
+    },
+    "toFindings": "Vai ai problemi di sicurezza",
+    "topDevices": "Dispositivi più a rischio",
+    "exposed": "Esposto a Internet",
+    "cappedDevice": "{{raw}} punti prima del limite",
+    "history": {
+      "title": "Storico",
+      "date": "Data",
+      "score": "Punteggio",
+      "change": "Variazione",
+      "cause": "Causa",
+      "provisionalNote": "* punteggio provvisorio (copertura bassa)."
+    }
+  },
+  "findings": {
+    "title": "Problemi di sicurezza",
+    "description": "Quanto emerso dalle scansioni delle reti autorizzate. Una vulnerabilità confermata è diversa da un rischio potenziale: ogni voce indica quanto è certa e da quali dati deriva.",
+    "backToHome": "Torna all'abitazione",
+    "empty": "Nessun problema trovato con i filtri scelti.",
+    "finding": "Problema",
+    "device": "Dispositivo",
+    "severityLabel": "Gravità",
+    "statusLabel": "Stato",
+    "confidenceLabel": "Affidabilità",
+    "firstDetected": "Prima rilevazione",
+    "lastDetected": "Ultima rilevazione",
+    "resolvedAt": "Risolto il",
+    "reason": "Motivazione",
+    "show": "Dettagli",
+    "whatItMeans": "Cosa significa",
+    "whatToDo": "Cosa fare",
+    "evidence": "Evidenze",
+    "cves": "Vulnerabilità note (CVE)",
+    "cveNote": "Associate al prodotto e alla versione dichiarati dal servizio, non verificati. Descrizioni in inglese dalla NVD.",
+    "moreCves": "Altre {{count}} CVE non mostrate.",
+    "kev": "Sfruttata attivamente",
+    "epss": "Probabilità di sfruttamento (EPSS): {{value}}",
+    "filter": {
+      "status": "Stato",
+      "severity": "Gravità",
+      "type": "Tipo",
+      "all": "Tutti"
+    },
+    "severity": {
+      "CRITICAL": "Critica",
+      "HIGH": "Alta",
+      "MEDIUM": "Media",
+      "LOW": "Bassa",
+      "INFORMATIONAL": "Informativa"
+    },
+    "status": {
+      "OPEN": "Aperto",
+      "ACKNOWLEDGED": "Preso in carico",
+      "RESOLVED": "Risolto",
+      "FALSE_POSITIVE": "Falso positivo",
+      "ACCEPTED_RISK": "Rischio accettato"
+    },
+    "confidence": {
+      "HIGH": "alta",
+      "MEDIUM": "media",
+      "LOW": "bassa"
+    },
+    "type": {
+      "CONFIRMED_VULNERABILITY": {
+        "label": "Vulnerabilità confermata",
+        "explanation": "La versione è stata letta direttamente dal protocollo e corrisponde esattamente a una vulnerabilità nota."
+      },
+      "POTENTIAL_RISK": {
+        "label": "Rischio potenziale",
+        "explanation": "I dati raccolti indicano un possibile rischio, ma non è stato possibile confermarlo (versione dichiarata, intervallo di versioni o condizioni da verificare)."
+      },
+      "SUSPICIOUS_CONFIGURATION": {
+        "label": "Configurazione sospetta",
+        "explanation": "Il dispositivo ha risposto con una configurazione considerata poco sicura."
+      },
+      "UNVERIFIED_INFORMATION": {
+        "label": "Informazione da verificare",
+        "explanation": "Un'informazione utile da controllare, non necessariamente un problema."
+      }
+    },
+    "match": {
+      "EXACT_VERSION": "versione esatta",
+      "VERSION_RANGE": "intervallo di versioni",
+      "PRODUCT_ONLY": "solo prodotto (versione sconosciuta)"
+    },
+    "triage": {
+      "title": "Gestisci",
+      "status": "Nuovo stato",
+      "reason": "Motivazione",
+      "note": "La motivazione è obbligatoria (tranne per riaprire) e viene registrata. Lo stato \"Risolto\" lo imposta solo una scansione successiva.",
+      "save": "Salva"
+    },
+    "rule": {
+      "telnet-open": {
+        "title": "Telnet attivo sulla porta {{port}}",
+        "description": "Telnet trasmette password e comandi in chiaro: chi è sulla stessa rete può leggerli. È anche un bersaglio comune dei malware per dispositivi IoT.",
+        "recommendation": "Disattiva Telnet dalle impostazioni del dispositivo e usa SSH o l'app ufficiale. Se non è possibile, aggiorna il firmware o valuta la sostituzione."
+      },
+      "ftp-cleartext": {
+        "title": "FTP senza cifratura sulla porta {{port}}",
+        "description": "FTP invia credenziali e file in chiaro sulla rete.",
+        "recommendation": "Disattiva FTP o usa SFTP / FTPS; se non serve, spegni il servizio."
+      },
+      "http-login-cleartext": {
+        "title": "Pagina di accesso senza HTTPS sulla porta {{port}}",
+        "description": "Le credenziali inserite in questa pagina viaggiano in chiaro sulla rete locale.",
+        "recommendation": "Abilita HTTPS nelle impostazioni del dispositivo, se disponibile, e usa una password unica."
+      },
+      "tls-legacy-protocol": {
+        "title": "Protocolli TLS obsoleti sulla porta {{port}} ({{versions}})",
+        "description": "TLS 1.0 e 1.1 sono deprecati e hanno debolezze note.",
+        "recommendation": "Aggiorna il firmware o disattiva TLS 1.0/1.1 nelle impostazioni, mantenendo TLS 1.2 o 1.3."
+      },
+      "tls-certificate-expired": {
+        "title": "Certificato scaduto sulla porta {{port}}",
+        "description": "Il certificato presentato dal dispositivo è scaduto: il browser mostra avvisi e diventa difficile accorgersi di un attacco.",
+        "recommendation": "Rinnova o rigenera il certificato dalle impostazioni del dispositivo o aggiorna il firmware."
+      },
+      "smb-v1-enabled": {
+        "title": "SMB1 attivo sulla porta {{port}}",
+        "description": "SMB1 è un protocollo obsoleto sfruttato da malware noti (es. ransomware).",
+        "recommendation": "Disattiva SMB1 e usa SMB2 o SMB3."
+      },
+      "upnp-exposed-mapping": {
+        "title": "Porta {{externalPort}} aperta verso Internet tramite UPnP",
+        "description": "Il router dichiara un inoltro automatico (UPnP) che rende raggiungibile da Internet la porta {{internalPort}} del dispositivo.",
+        "recommendation": "Rimuovi l'inoltro dal router, disattiva UPnP se non serve e usa l'accesso remoto ufficiale del produttore."
+      },
+      "upnp-igd-enabled": {
+        "title": "UPnP attivo sul router",
+        "description": "Qualsiasi dispositivo della rete può aprire porte verso Internet senza chiedere conferma.",
+        "recommendation": "Se non usi console o app che lo richiedono, disattiva UPnP nelle impostazioni del router."
+      },
+      "tr069-exposed": {
+        "title": "Porta di gestione remota TR-069 ({{port}}) raggiungibile",
+        "description": "TR-069 è usato dal provider per gestire il router da remoto. Di solito è normale, ma è utile saperlo.",
+        "recommendation": "Verifica con il provider che il firmware del router sia aggiornato."
+      },
+      "rtsp-open": {
+        "title": "Flusso video RTSP sulla porta {{port}}",
+        "description": "Il dispositivo offre un flusso video RTSP sulla rete locale. È stato inviato solo un controllo (OPTIONS): nessun video è stato aperto.",
+        "recommendation": "Verifica che il flusso richieda una password robusta; se non lo usi, disattivalo."
+      },
+      "mqtt-cleartext": {
+        "title": "MQTT senza cifratura sulla porta {{port}}",
+        "description": "I messaggi e le eventuali credenziali MQTT viaggiano in chiaro.",
+        "recommendation": "Usa MQTT su TLS (porta 8883) e richiedi l'autenticazione."
+      },
+      "snmp-enabled": {
+        "title": "SNMP attivo sulla porta {{port}}",
+        "description": "SNMP può esporre informazioni sul dispositivo; nessuna community è stata provata.",
+        "recommendation": "Se non serve, disattiva SNMP; altrimenti usa SNMPv3 con autenticazione."
+      },
+      "dns-open-resolver": {
+        "title": "Server DNS ricorsivo sulla porta {{port}}",
+        "description": "Un dispositivo diverso dal router risolve nomi per chiunque lo interroghi: può essere usato in modo improprio.",
+        "recommendation": "Verifica se il servizio DNS è voluto; se non serve, disattivalo."
+      },
+      "device-unknown": {
+        "title": "Dispositivo non identificato",
+        "description": "Non è stato possibile capire che tipo di dispositivo sia.",
+        "recommendation": "Controlla di cosa si tratta e imposta la categoria nella pagina dei dispositivi; se non lo riconosci, valuta di cambiare la password del Wi-Fi."
+      },
+      "cve-version-match": {
+        "title": "{{cve}} in {{product}} {{version}}",
+        "description": "La versione dichiarata dal servizio rientra in una vulnerabilità nota.",
+        "recommendation": "Aggiorna il firmware o il software del dispositivo all'ultima versione disponibile; se non ci sono aggiornamenti, limita l'accesso al servizio."
+      },
+      "cve-product-only": {
+        "title": "Vulnerabilità note per {{product}} (versione non determinata)",
+        "description": "Per questo prodotto esistono {{cves}} vulnerabilità note, ma la versione non è nota: non è possibile sapere se il dispositivo è interessato.",
+        "recommendation": "Verifica la versione installata nelle impostazioni del dispositivo e aggiornala se necessario."
+      }
     }
   },
   "errors": {
+    "PLAN_NOT_AVAILABLE": "Questo piano non è disponibile per il tuo account.",
+    "SUBSCRIPTION_EXISTS": "Hai già un abbonamento: modificalo da \"Gestisci abbonamento\".",
+    "NO_SUBSCRIPTION": "Non hai ancora un abbonamento.",
+    "BILLING_DISABLED": "Gli abbonamenti online non sono attivi.",
+    "BILLING_PROVIDER_ERROR": "Il servizio di pagamento non è raggiungibile. Riprova più tardi.",
+    "PLAN_FEATURE_UNAVAILABLE": "Funzione non inclusa nel tuo piano.",
+    "INVALID_LOGO": "Il logo deve essere un PNG o JPEG di massimo 256 KB e 2048×2048 pixel.",
+    "INVALID_COLOR": "Colore non valido.",
+    "INVALID_NAME": "Nome non valido.",
     "GENERIC": "Si è verificato un errore. Riprova.",
     "NETWORK": "Il servizio non è raggiungibile. Controlla la connessione.",
     "INVALID_CREDENTIALS": "Email o password non corrette.",
@@ -306,6 +1037,17 @@
     "INVALID_SCOPE": "Ambito non valido per questo ruolo.",
     "ROLE_ALREADY_ASSIGNED": "L'utente ha già questo ruolo.",
     "INVALID_STATUS": "Stato non valido.",
-    "UNKNOWN_ROLE": "Ruolo sconosciuto."
+    "UNKNOWN_ROLE": "Ruolo sconosciuto.",
+    "NO_AUTHORIZED_NETWORK": "Autorizza almeno una rete dell'abitazione prima di avviare una scansione.",
+    "AGENT_OFFLINE": "Nessun agent online per questa abitazione: avvia l'agent e riprova.",
+    "SCAN_ALREADY_ACTIVE": "C'è già una scansione in corso per questa abitazione.",
+    "SCAN_ALREADY_FINISHED": "La scansione è già terminata.",
+    "SCAN_CHANGED": "La scansione è stata aggiornata nel frattempo: riprova.",
+    "INVALID_SCAN_TRANSITION": "Operazione non possibile nello stato attuale della scansione.",
+    "INVALID_CATEGORY": "Categoria non valida.",
+    "INVALID_FILTER": "Filtro non valido.",
+    "REASON_REQUIRED": "Indica una motivazione.",
+    "INVALID_REASON": "La motivazione è troppo lunga (massimo 500 caratteri).",
+    "FINDING_RESOLVED": "Il problema è già risolto: si riaprirà da solo se una scansione lo rileva di nuovo."
   }
 }

@@ -6,7 +6,7 @@ import { nextRequest, settle } from '../../testing/http';
 import { ADMIN, TECHNICIAN, setupPage } from '../../testing/page-setup';
 import { OrganizationPage } from './organization.page';
 
-const PLAN = { code: 'FREE', maxHomes: 2, maxUsers: 3, maxCustomers: 2, maxNetworksPerHome: 4 };
+const PLAN = { code: 'FREE', maxHomes: 2, maxUsers: 3, maxCustomers: 2, maxNetworksPerHome: 4, maxAgentsPerHome: 2, maxScansPerDay: 10 };
 const BUSINESS: TenantOverview = {
   id: 't1', type: 'BUSINESS', name: 'Installatori Srl', status: 'ACTIVE', organizationId: 'o1', plan: PLAN,
   usage: { homes: 1, users: 2, customers: 0 },

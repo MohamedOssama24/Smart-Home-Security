@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.shsc.agents.management.AgentRepository.Agent;
+import com.shsc.agents.management.AgentRepository.AgentEvent;
 import com.shsc.agents.management.AgentRepository.EnrollmentToken;
 import com.shsc.audit.AuditAction;
 import com.shsc.audit.AuditEvent;
@@ -17,10 +18,13 @@ import com.shsc.homes.HomeRepository;
 import com.shsc.identity.access.AccessPolicy;
 import com.shsc.identity.access.AuthenticatedUser;
 import com.shsc.identity.access.Permissions;
+import com.shsc.scans.ScanRequestService;
 import com.shsc.shared.config.ShscProperties;
 import com.shsc.shared.crypto.SecureTokens;
 import com.shsc.shared.web.ApiException;
 import com.shsc.shared.web.ClientInfo;
+import com.shsc.tenancy.PlanLimits;
+import com.shsc.tenancy.PlanLimits.Resource;
 
 /** User-side agent administration: enrollment tokens, agent list, revocation. */
 @Service
@@ -33,11 +37,15 @@ public class AgentManagementService {
     private final HomeRepository homes;
     private final AccessPolicy access;
     private final AuditLog audit;
+    private final PlanLimits limits;
     private final ShscProperties.Agent settings;
     private final Clock clock;
+    private final ScanRequestService scanRequests;
 
     public AgentManagementService(AgentRepository agents, HomeRepository homes, AccessPolicy access, AuditLog audit,
-            ShscProperties properties, Clock clock) {
+            PlanLimits limits, ShscProperties properties, Clock clock, ScanRequestService scanRequests) {
+        this.scanRequests = scanRequests;
+        this.limits = limits;
         this.agents = agents;
         this.homes = homes;
         this.access = access;
@@ -51,6 +59,8 @@ public class AgentManagementService {
     public CreatedEnrollmentToken createEnrollmentToken(UUID homeId, ClientInfo client) {
         homes.find(homeId).orElseThrow(ApiException::notFound);
         AuthenticatedUser user = access.requireOnHome(Permissions.AGENT_ENROLL, homeId);
+        // early feedback; the authoritative check is repeated when the agent enrolls
+        limits.requireCapacity(Resource.AGENTS_PER_HOME, homeId);
         Instant now = clock.instant();
         String secret = SecureTokens.generate(SecureTokens.ENROLLMENT_TOKEN_PREFIX);
         EnrollmentToken token = agents.insertEnrollmentToken(user.tenantId(), homeId, SecureTokens.sha256(secret),
@@ -94,6 +104,13 @@ public class AgentManagementService {
         return agent;
     }
 
+    @Transactional(readOnly = true)
+    public List<AgentEvent> events(UUID agentId) {
+        Agent agent = agents.find(agentId).orElseThrow(ApiException::notFound);
+        access.requireOnHome(Permissions.AGENT_READ, agent.homeId());
+        return agents.events(agentId, 50);
+    }
+
     /** Revokes the agent: credentials and access tokens stop working at the next request. */
     @Transactional
     public Agent revoke(UUID agentId, String reason, ClientInfo client) {
@@ -103,6 +120,8 @@ public class AgentManagementService {
             return agent;
         }
         agents.revokeAgent(agentId, user.userId(), reason, clock.instant());
+        // its active scans cannot complete any more
+        scanRequests.failScansOfRevokedAgent(agentId, user.userId());
         audit.record(AuditEvent.of(AuditAction.AGENT_REVOKED).tenant(user.tenantId()).user(user.userId())
                 .target("AGENT", agentId).client(client).detail("homeId", agent.homeId()).detail("reason", reason)
                 .build());

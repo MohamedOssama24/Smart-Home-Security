@@ -1,5 +1,7 @@
 # 07 — Device Discovery e Device Fingerprinting
 
+> **Stato (Milestone 7)**: la discovery (§1) è implementata come descritto in [16-NETWORK-DISCOVERY.md](16-NETWORK-DISCOVERY.md); fingerprinting, OUI e inventario sono implementati come descritto in [17-DEVICE-FINGERPRINTING.md](17-DEVICE-FINGERPRINTING.md) (M8).
+
 ## 1. Pipeline di discovery (agent)
 
 ```
@@ -56,7 +58,7 @@ Chiave primaria: `(home, MAC)`. Senza MAC (host fuori L2 noti via router): `(hom
 Registri IEEE MA-L/MA-M/MA-S (CSV pubblici) in tabella `oui_entries`, aggiornati dal backend (job di sync dati) e distribuiti all'agent come snapshot con ETag. Il risultato è il **produttore della scheda di rete**, che spesso differisce dal marchio del prodotto (es. modulo Wi-Fi Espressif in un prodotto di altra marca): usato come indizio **debole** per manufacturer di prodotto.
 
 ### 2.3 Motore di classificazione (regole + punteggi)
-Ogni regola: `id`, condizioni sulle evidenze, categoria candidata, peso, forza (`STRONG`/`MODERATE`/`WEAK`). Ruleset versionato (YAML in repo, caricato all'avvio, `ruleset_version` salvato con il risultato).
+Ogni regola: `id`, condizioni sulle evidenze, categoria candidata, peso, forza (`STRONG`/`MODERATE`/`WEAK`). Ruleset versionato (JSON in repo, `fingerprint/rules.json`, validato all'avvio, `ruleset_version` salvato con il risultato; ADR-046).
 
 | Esempio regola | Categoria | Forza |
 |---|---|---|

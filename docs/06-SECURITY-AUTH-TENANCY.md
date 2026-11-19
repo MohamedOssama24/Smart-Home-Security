@@ -8,8 +8,8 @@
 | Refresh token | opaco 256 bit, salvato come SHA-256, 14 gg (30 con "ricordami"), **rotazione a ogni uso**; riuso di un token già ruotato ⇒ revoca dell'intera famiglia + alert sicurezza |
 | Trasporto web | access token **in memoria** (mai localStorage); refresh in cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` |
 | CSRF | richiesto solo sulle rotte che usano il cookie (`/auth/refresh`, `/auth/logout`): SameSite=Strict + double-submit token header. Le altre API usano Bearer → non vulnerabili a CSRF |
-| Mobile | refresh token in `flutter_secure_storage` (Keychain/Keystore), inviato nel body |
-| MFA | **TOTP** (RFC 6238) + 10 recovery code monouso; obbligatoria per SUPER_ADMIN e ORG_ADMIN, opzionale per gli altri. WebAuthn/passkey in roadmap |
+| Mobile | refresh token in `flutter_secure_storage` (Keychain/Keystore), inviato nel body di `/auth/mobile/*` (implementato in M14, [23-MOBILE-APP.md](23-MOBILE-APP.md) §2) |
+| MFA | **TOTP** (RFC 6238) + 10 recovery code monouso; obbligatoria per SUPER_ADMIN e ORGANIZATION_ADMIN, opzionale per gli altri. WebAuthn/passkey in roadmap |
 | Account | verifica email, lockout progressivo, notifica nuovo login, reset password con token monouso 30 min |
 
 ## 2. Modello multi-tenant
@@ -17,7 +17,7 @@
 Tenant (isolamento + abbonamento)
  ├── INDIVIDUAL (B2C):  utenti ─► homes ─► networks/agents/devices
  └── BUSINESS (B2B):    organization ─► customers ─► homes ─► networks/agents/devices
-                        utenti dell'organizzazione (ORG_ADMIN, TECHNICIAN, READ_ONLY)
+                        utenti dell'organizzazione (ORGANIZATION_ADMIN, TECHNICIAN, READ_ONLY)
                         utenti dei clienti (CUSTOMER) limitati alle homes del proprio customer
 ```
 - Strategia: **database condiviso, schema condiviso, colonna `tenant_id` + RLS** (vedi `04-DATABASE.md §3`). È la soluzione più economica e scalabile per migliaia di tenant piccoli; schema-per-tenant valutato e scartato (migrazioni N volte, pool di connessioni).
@@ -27,7 +27,7 @@ Tenant (isolamento + abbonamento)
 | Ruolo | Ambito | Capacità principali |
 |---|---|---|
 | SUPER_ADMIN | piattaforma | amministrazione, supporto (accesso ai tenant solo con motivazione registrata, "break-glass") |
-| ORG_ADMIN | tenant | tutto nel tenant: utenti, clienti, homes, agent, billing |
+| ORGANIZATION_ADMIN | tenant | tutto nel tenant: utenti, clienti, homes, agent, billing |
 | TECHNICIAN | tenant o clienti assegnati | homes, agent, scansioni, classificazione, finding, report; no billing/utenti |
 | CUSTOMER | proprie homes (B2C: proprietario; B2B: homes del proprio customer) | scansioni manuali, consultazione, preferenze; in B2C anche billing |
 | READ_ONLY | ambito assegnato | sola lettura |

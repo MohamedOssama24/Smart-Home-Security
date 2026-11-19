@@ -203,6 +203,29 @@ func TestEnrollStoresIdentityAndPrivateKeyLocally(t *testing.T) {
 	}
 }
 
+// The service runs from another working directory (and account): the CA file given with a
+// relative path at enrollment must still be found.
+func TestEnrollKeepsACopyOfTheCAWithAnAbsolutePath(t *testing.T) {
+	_, srv, ca := newFakeBackend(t)
+	t.Chdir(filepath.Dir(ca))
+	store := identity.Store{Dir: filepath.Join(t.TempDir(), "state")}
+	svc := Service{Store: store}
+	if _, err := svc.Enroll(context.Background(), srv.URL, filepath.Base(ca), "shsc_enr_valid", ""); err != nil {
+		t.Fatal(err)
+	}
+	state, _, err := store.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.CAFile != filepath.Join(store.Dir, "ca.pem") {
+		t.Fatalf("CA file must be an absolute copy in the state directory, got %q", state.CAFile)
+	}
+	t.Chdir(t.TempDir())
+	if _, err := svc.Check(context.Background()); err != nil {
+		t.Fatalf("login from another directory: %v", err)
+	}
+}
+
 func TestEnrollRejectsHTTPAndReuse(t *testing.T) {
 	_, srv, ca := newFakeBackend(t)
 	svc := Service{Store: identity.Store{Dir: t.TempDir()}}

@@ -215,6 +215,26 @@ table.list td {
   color: var(--err-fg);
 }
 
+.badge.warn {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+
+dl.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0 0 12px;
+}
+
+dl.facts dt {
+  font-weight: 600;
+}
+
+dl.facts dd {
+  margin: 0;
+}
+
 code.secret {
   display: block;
   padding: 10px;
@@ -232,4 +252,29 @@ code.secret {
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+}
+
+/* Milestone 12: small screens (cards fill the width, wide tables scroll inside the card) */
+.small {
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 16px;
+    border-radius: 10px;
+  }
+
+  table.list {
+    display: block;
+    overflow-x: auto;
+  }
+
+  dl.facts {
+    grid-template-columns: 1fr;
+  }
+
+  dl.facts dd {
+    margin-bottom: 6px;
+  }
 }

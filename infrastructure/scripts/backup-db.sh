@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Logical backup of the PostgreSQL database (pg_dump custom format) with retention.
 # Usage: infrastructure/scripts/backup-db.sh            (reads .env from the repository root)
-# Restore: docker compose exec -T postgres pg_restore -U "$POSTGRES_SUPERUSER" -d "$SHSC_DB_NAME" --clean < file.dump
-# NOTE: off-site, encrypted backup storage is part of Milestone 18 (hardening).
+# Restore: infrastructure/scripts/restore-db.sh verify|live <file.dump> (M18)
+# NOTE: copy the dumps off-site, encrypted (not automated: see docs/27-RELEASE-HARDENING.md).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

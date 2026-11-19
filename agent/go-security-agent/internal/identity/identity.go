@@ -7,10 +7,14 @@
 //	agent.json      identity (no secrets)
 //	agent.key       current private key, PKCS#8 PEM
 //	agent.key.next  new key during a rotation, promoted once the backend accepted it
+//	ca.pem          optional extra CA certificate given at enrollment (--ca-file)
+//	router.json     optional router integration settings with the owner's router
+//	                credentials (TR-064, SNMP), protected like the keys; deleted by Retire
 //
-// On Windows the POSIX modes are not enforced by the OS: the default directory under
-// %ProgramData% inherits its ACL. Protection with DPAPI is planned with the Windows
-// service (Milestone 5).
+// On Windows the POSIX modes are not enforced by the OS: the key files are encrypted with
+// DPAPI (machine scope) and the directory gets an explicit ACL (see protect_windows.go).
+// When the backend reports that the agent was revoked, Retire deletes the keys so that the
+// agent stops for good and a new enrollment is possible.
 package identity
 
 import (
@@ -32,7 +36,13 @@ const (
 	stateFile   = "agent.json"
 	keyFile     = "agent.key"
 	pendingFile = "agent.key.next"
-	pemType     = "PRIVATE KEY"
+	caFile      = "ca.pem"
+	routerFile  = "router.json"
+	// homeAssistantFile holds the Home Assistant URL and long-lived token (Milestone 15)
+	homeAssistantFile = "homeassistant.json"
+	pemType           = "PRIVATE KEY"
+	// dpapiMagic prefixes key files encrypted with Windows DPAPI
+	dpapiMagic = "SHSC-DPAPI-1\n"
 )
 
 // ErrNotEnrolled is returned when no identity is stored.
@@ -46,6 +56,8 @@ type State struct {
 	APIURL       string    `json:"apiUrl"`
 	CAFile       string    `json:"caFile,omitempty"`
 	EnrolledAt   time.Time `json:"enrolledAt"`
+	// JobSigningKey is the pinned backend key that signs scan jobs (raw Ed25519, base64url).
+	JobSigningKey string `json:"jobSigningKey,omitempty"`
 }
 
 // Store reads and writes the identity in a directory.
@@ -90,6 +102,9 @@ func (s Store) Exists() bool {
 func (s Store) Save(state State, key ed25519.PrivateKey) error {
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
 		return fmt.Errorf("create state directory: %w", err)
+	}
+	if err := s.Secure(); err != nil {
+		return fmt.Errorf("protect state directory: %w", err)
 	}
 	if err := s.writeKey(keyFile, key); err != nil {
 		return err
@@ -161,18 +176,122 @@ func (s Store) DiscardPendingKey() error {
 	return err
 }
 
+// SaveCA copies an extra CA certificate (e.g. the development certificate) into the state
+// directory and returns its absolute path.
+func (s Store) SaveCA(source string) (string, error) {
+	data, err := os.ReadFile(source)
+	if err != nil {
+		return "", err
+	}
+	if block, _ := pem.Decode(data); block == nil || block.Type != "CERTIFICATE" {
+		return "", fmt.Errorf("%s is not a PEM certificate", source)
+	}
+	target, err := filepath.Abs(filepath.Join(s.Dir, caFile))
+	if err != nil {
+		return "", err
+	}
+	return target, writeAtomic(target, data)
+}
+
+// Secure restricts access to the state directory (0700, or an explicit ACL on Windows).
+func (s Store) Secure() error {
+	return secureDir(s.Dir)
+}
+
+// Retire is called when the backend reports that the agent was revoked: the private keys
+// are deleted (they will never be accepted again) and the identity is kept only as
+// agent.revoked-<time>.json for diagnosis. Afterwards Exists is false and a new enrollment
+// with a new token is possible.
+func (s Store) Retire(now time.Time) error {
+	for _, name := range []string{keyFile, pendingFile, routerFile, homeAssistantFile} {
+		if err := os.Remove(filepath.Join(s.Dir, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("delete %s: %w", name, err)
+		}
+	}
+	archived := fmt.Sprintf("agent.revoked-%s.json", now.UTC().Format("20060102T150405Z"))
+	err := os.Rename(filepath.Join(s.Dir, stateFile), filepath.Join(s.Dir, archived))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+// SaveRouter stores the router integration settings given by the owner (JSON with the
+// router credentials), protected like the private key. They never leave this machine.
+func (s Store) SaveRouter(config []byte) error { return s.saveSecret(routerFile, config) }
+
+// LoadRouter returns the router integration settings; ok is false when none are stored.
+func (s Store) LoadRouter() (config []byte, ok bool, err error) { return s.loadSecret(routerFile) }
+
+// RemoveRouter deletes the router integration settings.
+func (s Store) RemoveRouter() error { return s.removeFile(routerFile) }
+
+// SaveHomeAssistant stores the Home Assistant settings (URL and long-lived token of the owner),
+// protected like the private key. They never leave this machine.
+func (s Store) SaveHomeAssistant(config []byte) error { return s.saveSecret(homeAssistantFile, config) }
+
+// LoadHomeAssistant returns the Home Assistant settings; ok is false when none are stored.
+func (s Store) LoadHomeAssistant() (config []byte, ok bool, err error) {
+	return s.loadSecret(homeAssistantFile)
+}
+
+// RemoveHomeAssistant deletes the Home Assistant settings.
+func (s Store) RemoveHomeAssistant() error { return s.removeFile(homeAssistantFile) }
+
+func (s Store) saveSecret(name string, config []byte) error {
+	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
+		return err
+	}
+	data, err := protectKey(config)
+	if err != nil {
+		return err
+	}
+	return writeAtomic(filepath.Join(s.Dir, name), data)
+}
+
+func (s Store) loadSecret(name string) (config []byte, ok bool, err error) {
+	raw, err := os.ReadFile(filepath.Join(s.Dir, name))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	data, err := unprotectKey(raw)
+	if err != nil {
+		return nil, false, fmt.Errorf("%s: %w", name, err)
+	}
+	return data, true, nil
+}
+
+func (s Store) removeFile(name string) error {
+	err := os.Remove(filepath.Join(s.Dir, name))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return err
+}
+
 func (s Store) writeKey(name string, key ed25519.PrivateKey) error {
 	der, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
 		return err
 	}
-	return writeAtomic(filepath.Join(s.Dir, name), pem.EncodeToMemory(&pem.Block{Type: pemType, Bytes: der}))
+	data, err := protectKey(pem.EncodeToMemory(&pem.Block{Type: pemType, Bytes: der}))
+	if err != nil {
+		return err
+	}
+	return writeAtomic(filepath.Join(s.Dir, name), data)
 }
 
 func (s Store) readKey(name string) (ed25519.PrivateKey, error) {
-	data, err := os.ReadFile(filepath.Join(s.Dir, name))
+	raw, err := os.ReadFile(filepath.Join(s.Dir, name))
 	if err != nil {
 		return nil, err
+	}
+	data, err := unprotectKey(raw)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", name, err)
 	}
 	block, _ := pem.Decode(data)
 	if block == nil || block.Type != pemType {

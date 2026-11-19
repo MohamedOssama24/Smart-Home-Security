@@ -42,6 +42,8 @@ spring:
   messages:
     basename: i18n/messages
     fallback-to-system-locale: false
+    # apostrophes are always written doubled (MessageFormat), also in texts without arguments
+    always-use-message-format: true
 
 server:
   port: 8080
@@ -134,3 +136,74 @@ shsc:
     clock-skew: PT30S
     assertion-audience: shsc-agent-token
     rotation-audience: shsc-agent-rotate
+    # below 30 s so that a revoked agent notices it within 30 s (docs/03-AGENT-PROTOCOL.md §5)
+    heartbeat-interval: PT25S
+  scans:
+    # base64 PKCS#8 DER Ed25519 private key that signs the scan jobs
+    # (infrastructure/scripts/generate-job-signing-key.sh); agents pin its public key
+    job-signing-key: ${SHSC_JOB_SIGNING_KEY}
+    # a queued job not collected by the agent within this time fails (AGENT_OFFLINE)
+    queue-ttl: PT10M
+    # renewed by every progress report; when it expires the scan fails (AGENT_LOST)
+    lease: PT2M
+    max-duration: PT15M
+    # results of a scan failed with AGENT_LOST are still accepted for this long (LATE_UPLOAD)
+    late-upload-window: P1D
+    # maximum wait of GET /agent/jobs/next
+    long-poll-max: PT25S
+    progress-interval: PT5S
+    reaper-interval: PT30S
+  alerts:
+    # pending alert e-mails are sent by a periodic job (retried after 5 and 15 minutes)
+    dispatch-interval: ${SHSC_ALERT_DISPATCH_INTERVAL:PT30S}
+    # active agents without heartbeat for 15 minutes raise AGENT_OFFLINE
+    agent-check-interval: PT1M
+  push:
+    fcm:
+      # Firebase project of the owner (free FCM). Empty = push disabled: no PUSH delivery is created.
+      project-id: ${SHSC_FCM_PROJECT_ID:}
+      # service-account JSON downloaded from the Firebase console, mounted as a secret file
+      credentials-file: ${SHSC_FCM_CREDENTIALS_FILE:}
+      endpoint: https://fcm.googleapis.com
+  assistant:
+    # LOCAL = deterministic answers built from the tenant data (default, offline, free).
+    # OLLAMA = local LLM (free, self-hosted); its answers are checked for grounding, LOCAL is the fallback.
+    provider: ${SHSC_ASSISTANT_PROVIDER:LOCAL}
+    max-per-user-per-minute: 20
+    ollama:
+      url: ${SHSC_OLLAMA_URL:}
+      model: ${SHSC_OLLAMA_MODEL:llama3.2}
+      timeout: PT30S
+  billing:
+    stripe:
+      # Stripe (ADR-072). Empty secret key or webhook secret = online subscriptions disabled (plans set by
+      # hand). Only test keys (sk_test_/rk_test_) are accepted unless allow-live=true.
+      secret-key: ${SHSC_STRIPE_SECRET_KEY:}
+      webhook-secret: ${SHSC_STRIPE_WEBHOOK_SECRET:}
+      price-plus: ${SHSC_STRIPE_PRICE_PLUS:}
+      price-pro: ${SHSC_STRIPE_PRICE_PRO:}
+      allow-live: ${SHSC_STRIPE_ALLOW_LIVE:false}
+      # free trial in days offered once per tenant at checkout (0 = no trial, max 730)
+      trial-days: ${SHSC_STRIPE_TRIAL_DAYS:0}
+      api-url: https://api.stripe.com
+      webhook-tolerance: PT5M
+  reports:
+    # PDF reports of a home generated in the last 24 hours (limit until the plans of M17)
+    max-per-home-per-day: 20
+  oui:
+    # public IEEE registration authority files; downloaded only on request of a platform administrator
+    sources: ${SHSC_OUI_SOURCES:https://standards-oui.ieee.org/oui/oui.csv,https://standards-oui.ieee.org/oui28/mam.csv,https://standards-oui.ieee.org/oui36/oui36.csv}
+    max-bytes: 16777216
+    timeout: PT60S
+  vulnerabilities:
+    # public feeds (NVD CVE API 2.0, CISA KEV, FIRST EPSS); downloaded only on request of a platform administrator
+    nvd-url: ${SHSC_NVD_URL:https://services.nvd.nist.gov/rest/json/cves/2.0}
+    kev-url: ${SHSC_KEV_URL:https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json}
+    epss-url: ${SHSC_EPSS_URL:https://api.first.org/data/v1/epss}
+    # optional free NVD API key (sent as the apiKey header, never logged)
+    nvd-api-key: ${SHSC_NVD_API_KEY:}
+    # NVD public rate limit: 5 requests / 30 s without a key
+    nvd-request-delay: ${SHSC_NVD_REQUEST_DELAY:PT6S}
+    max-bytes: 33554432
+    timeout: PT60S
+    max-pages-per-product: 10

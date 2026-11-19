@@ -1,5 +1,5 @@
 // Package cli implements the agent command-line interface. Commands are added milestone by
-// milestone (run and diagnose arrive in Milestone 5); only implemented commands are listed.
+// milestone; only implemented commands are listed.
 package cli
 
 import (
@@ -17,13 +17,16 @@ import (
 	"shsc/agent/internal/buildinfo"
 	"shsc/agent/internal/cloud"
 	"shsc/agent/internal/identity"
+	"shsc/agent/internal/service"
 )
 
-// Exit codes.
+// Exit codes. ExitRevoked and ExitNotEnrolled tell the service manager not to restart.
 const (
-	ExitOK    = 0
-	ExitError = 1
-	ExitUsage = 2
+	ExitOK          = 0
+	ExitError       = 1
+	ExitUsage       = 2
+	ExitRevoked     = service.ExitRevoked
+	ExitNotEnrolled = service.ExitNotEnrolled
 )
 
 const usage = `Smart Home Security Check - local security agent
@@ -33,13 +36,19 @@ Usage:
 
 Commands:
   enroll      Register this agent for a home with a one-time enrollment token
+  run         Run the agent: heartbeat, self-diagnosis and event queue (used by the service)
+  service     Manage the system service: install | uninstall | start | stop | status
+  diagnose    Show capabilities, network interfaces, local queue and backend connectivity
   status      Authenticate with the backend and show the agent/home binding
   rotate-key  Replace the agent key (the old key stops working immediately)
+  router      Configure the read-only router integrations (TR-064, SNMP) with your credentials
+  homeassistant  Configure the read-only Home Assistant integration with your long-lived token
   version     Print version information (use --json for machine-readable output)
   help        Show this help
 
 The enrollment token can be passed with --token-file or the SHSC_ENROLLMENT_TOKEN
 environment variable (preferred over --token, which is visible in the process list).
+The agent never starts a scan by itself: scans are started by the owner from the dashboard.
 `
 
 const requestTimeout = 60 * time.Second
@@ -54,12 +63,22 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "enroll":
 		return runEnroll(args[1:], stdout, stderr)
+	case "run":
+		return runAgent(args[1:], stdout, stderr)
+	case "service":
+		return runService(args[1:], stdout, stderr)
+	case "diagnose":
+		return runDiagnose(args[1:], stdout, stderr)
 	case "status":
 		return runStatus(args[1:], stdout, stderr)
 	case "rotate-key":
 		return runRotate(args[1:], stdout, stderr)
 	case "version":
 		return runVersion(args[1:], stdout, stderr)
+	case "router":
+		return runRouter(args[1:], stdout, stderr)
+	case "homeassistant":
+		return runHomeAssistant(args[1:], stdout, stderr)
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
 		return ExitOK
@@ -167,7 +186,11 @@ func runRotate(args []string, stdout, stderr io.Writer) int {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
-	credential, err := agentauth.Service{Store: identity.Store{Dir: *stateDir}}.RotateKey(ctx)
+	store := identity.Store{Dir: *stateDir}
+	credential, err := agentauth.Service{Store: store}.RotateKey(ctx)
+	if ownerErr := store.MatchOwner(); ownerErr != nil {
+		fmt.Fprintf(stderr, "rotate-key: warning: cannot give the new key to the service user: %v\n", ownerErr)
+	}
 	if err != nil {
 		return fail(stderr, "rotate-key", err)
 	}

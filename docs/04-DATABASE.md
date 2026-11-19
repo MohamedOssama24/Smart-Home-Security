@@ -1,5 +1,17 @@
 # 04 — Progettazione database (PostgreSQL 18)
 
+> **Milestone 6**: migrazione `V006__manual_scans.sql`: `scans`, `scan_targets`, `scan_events`, `scan_result_batches`, `scan_observations` (tutte con RLS), `plans.max_scans_per_day`, permessi `scan:read`/`scan:create`, funzione `scans_due_for_reaping`. Dettagli in [15-MANUAL-SCANS.md](15-MANUAL-SCANS.md).
+
+> **Milestone 7**: migrazione `V007__network_discovery.sql`: nuovi metodi in `scan_observations`, colonne `hostname` e `details` (jsonb ≤ 4096 byte). Vedi [16-NETWORK-DISCOVERY.md](16-NETWORK-DISCOVERY.md) §5.
+
+> **Milestone 8**: migrazione `V008__device_fingerprinting.sql`: `oui_entries` (globale, senza RLS), `devices` (con `mac_randomized`, `probable_same_as`, `addresses`, categoria rilevata/manuale, `classification` jsonb, `ruleset_version`), `device_identifications`, `device_category_changes` (con RLS), `scan_observations.device_id`, permessi `device:read`/`device:classify`. Vedi [17-DEVICE-FINGERPRINTING.md](17-DEVICE-FINGERPRINTING.md).
+
+> **Milestone 9**: migrazione `V009__port_scanning.sql`: profili `QUICK`/`STANDARD`, metodo `PORTSCAN` (contatori per host), `open_ports` (solo porte aperte, unica per `(scan_id, ip, protocol, port)`, `device_id` impostato dal fingerprinting), `detected_services`, `detected_protocols` (con RLS), `scan_result_batches.port_count`. Vedi [18-PORT-SCANNING.md](18-PORT-SCANNING.md) §6 e ADR-049.
+
+> **Milestone 10**: migrazione `V010__security_analysis.sql`: `findings` (con `fingerprint` unico per dispositivo, `rule_version`, `protocol`/`port`/`cve_id`, motivazione e autore del triage), `finding_evidence` (una per scansione), `device_vulnerabilities` (collegate al finding), mirror globale senza RLS `vulnerabilities`, `vulnerability_cpe_matches` (criteri CPE scomposti, `requires_platform`), `vulnerability_kev`, `vulnerability_epss` (tabelle separate, sostituite dai rispettivi feed), `vulnerability_feed_status`; permessi `finding:read`/`finding:triage`. Vedi [19-SECURITY-ANALYSIS.md](19-SECURITY-ANALYSIS.md) e ADR-054…058.
+>
+> **Milestone 11**: migrazione `V011__risk_engine.sql`: `risk_snapshots` (solo inserimenti, RLS) con `trigger` (`SCAN`/`TRIAGE`), `score`/`risk_level`/`rating` nulli quando non calcolato (`not_computed_reason`, scansione `DISCOVERY`), `coverage` + `coverage_detail`, `provisional`, `breakdown`, `top_devices`, `delta_from_previous`, `engine_version`. Le colonne `scans.coverage`/`devices_analyzed` non sono state aggiunte: la copertura è nello snapshot. Vedi [20-RISK-ENGINE.md](20-RISK-ENGINE.md) e ADR-059…063.
+
 ## 1. Convenzioni
 - PK `uuid` **UUIDv7** (ordinabile nel tempo; `uuidv7()` nativo in PG18, generato anche lato app).
 - Ogni tabella tenant-scoped ha `tenant_id uuid NOT NULL` + FK + indice, e una **policy RLS** (§3).
@@ -19,7 +31,7 @@
 | `customers` | id, tenant_id, organization_id, display_name, contact | clienti gestiti da un'organizzazione B2B |
 | `users` | id, email (citext, unique globale), password_hash (Argon2id), status, locale, email_verified_at, mfa_enabled, failed_logins, locked_until | un utente appartiene a un tenant |
 | `tenant_memberships` | user_id, tenant_id, status | predisposto per utenti multi-tenant (tecnici) |
-| `roles` | id, code (`SUPER_ADMIN`,`ORG_ADMIN`,`TECHNICIAN`,`CUSTOMER`,`READ_ONLY`), system bool | |
+| `roles` | id, code (`SUPER_ADMIN`,`ORGANIZATION_ADMIN`,`TECHNICIAN`,`CUSTOMER`,`READ_ONLY`), system bool | |
 | `permissions` | id, code (es. `scan:create`, `device:classify`, `agent:revoke`) | |
 | `role_permissions` | role_id, permission_id | |
 | `user_roles` | user_id, role_id, tenant_id, scope_type (`TENANT`/`CUSTOMER`/`HOME`), scope_id | ruolo con ambito |
@@ -36,6 +48,11 @@
 > - `network_authorizations`: corrisponde a `authorized_networks` qui sotto. Conserva lo storico, con al massimo un'autorizzazione attiva per rete.
 > - Nuovo ambito di ruolo `CUSTOMER` e scopo `INVITATION` per i token monouso.
 > - `gateway` e `interface_name` delle reti arriveranno con le reti rilevate dall'agent.
+
+> **Implementato in Milestone 5** (`V005__agent_runtime.sql`, dettagli in [14-AGENT-RUNTIME.md](14-AGENT-RUNTIME.md)):
+> - `agents`: aggiunti `last_heartbeat_at`, `capabilities` (jsonb ≤ 4 KB), `interfaces` (jsonb ≤ 64 KB), `interfaces_hash`, `queue_depth`, `uptime_seconds`, `last_error` (≤ 300 caratteri). Lo stato di connettività non è salvato: si calcola da `last_heartbeat_at`.
+> - `agent_events`: `event_id` scelto dall'agent con `UNIQUE(agent_id, event_id)` (reinvio idempotente), `type`, `occurred_at`, `received_at`, `detail` jsonb ≤ 4 KB; RLS per tenant; ultimi 500 per agent, nessun partizionamento.
+> - `plans.max_agents_per_home` (FREE: 2).
 
 ### Abitazioni, reti, agent
 | Tabella | Colonne principali | Note |
@@ -91,7 +108,7 @@
 | `plans` | id, code (`FREE`,`HOME`,`PROFESSIONAL`,`BUSINESS`), limits jsonb (homes, agents, devices, scans/giorno, profili, report, utenti), stripe_price_ids |
 | `subscriptions` | id, tenant_id, plan_id, status (`TRIALING`,`ACTIVE`,`PAST_DUE`,`CANCELED`), stripe_customer_id, stripe_subscription_id, trial_ends_at, current_period_end, cancel_at_period_end |
 | `payments` | id, tenant_id, subscription_id, stripe_invoice_id, amount_cents, currency, status, paid_at (nessun dato carta) |
-| `stripe_webhook_events` | event_id (PK), type, received_at, processed_at — idempotenza webhook |
+| `stripe_webhook_events` | event_id (PK), type, tenant_id, outcome, received_at — idempotenza webhook, RLS per tenant (V017, M18) |
 | `idempotency_keys` | key, user_id, endpoint, response_hash, created_at |
 
 ## 3. Tenant isolation — difesa in profondità

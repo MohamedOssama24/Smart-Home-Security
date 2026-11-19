@@ -66,15 +66,25 @@ func (s Service) Enroll(ctx context.Context, apiURL, caFile, token, name string)
 		return identity.State{}, err
 	}
 	state := identity.State{
-		AgentID:      resp.AgentID,
-		HomeID:       resp.HomeID,
-		CredentialID: resp.CredentialID,
-		APIURL:       strings.TrimRight(apiURL, "/"),
-		CAFile:       caFile,
-		EnrolledAt:   s.now().UTC(),
+		AgentID:       resp.AgentID,
+		HomeID:        resp.HomeID,
+		CredentialID:  resp.CredentialID,
+		APIURL:        strings.TrimRight(apiURL, "/"),
+		JobSigningKey: resp.JobSigningKey,
+		EnrolledAt:    s.now().UTC(),
 	}
 	if err := s.Store.Save(state, key); err != nil {
 		return identity.State{}, fmt.Errorf("agent enrolled as %s but the identity could not be saved: %w", resp.AgentID, err)
+	}
+	if caFile != "" {
+		// the service runs from another directory and with another account: keep a copy of the
+		// CA certificate next to the identity, with an absolute path
+		if state.CAFile, err = s.Store.SaveCA(caFile); err != nil {
+			return identity.State{}, fmt.Errorf("agent enrolled as %s but the CA file could not be stored: %w", resp.AgentID, err)
+		}
+		if err := s.Store.SaveState(state); err != nil {
+			return identity.State{}, err
+		}
 	}
 	return state, nil
 }

@@ -17,11 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
 import com.shsc.agents.management.AgentManagementService.CreatedEnrollmentToken;
 import com.shsc.agents.management.AgentRepository.Agent;
 import com.shsc.agents.management.AgentRepository.EnrollmentToken;
+import com.shsc.agents.runtime.AgentRuntimeService;
+import com.shsc.agents.runtime.AgentRuntimeService.Connectivity;
 import com.shsc.shared.web.ClientInfo;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Agent administration for users (user JWT). Agents themselves use /api/v1/agent/**. */
 @RestController
@@ -39,24 +43,38 @@ public class AgentManagementController {
     public record CreatedEnrollmentTokenResponse(UUID id, UUID homeId, String token, Instant expiresAt) {
     }
 
+    /** Agent with its connectivity and the self-diagnosis of its last heartbeat. */
     public record AgentResponse(UUID id, UUID homeId, String name, String hostname, String os, String arch,
             String agentVersion, String status, Instant enrolledAt, Instant lastSeenAt, Instant revokedAt,
-            String revokeReason) {
-        static AgentResponse of(Agent a) {
-            return new AgentResponse(a.id(), a.homeId(), a.name(), a.hostname(), a.os(), a.arch(), a.agentVersion(),
-                    a.status().name(), a.enrolledAt(), a.lastSeenAt(), a.revokedAt(), a.revokeReason());
-        }
+            String revokeReason, Connectivity connectivity, Instant lastHeartbeatAt, JsonNode capabilities,
+            JsonNode interfaces, Integer queueDepth, Long uptimeSeconds, String lastError) {
+    }
+
+    public record AgentEventResponse(UUID id, String type, Instant occurredAt, Instant receivedAt, JsonNode detail) {
     }
 
     public record RevokeAgentRequest(@Size(max = 200) String reason) {
     }
 
     private final AgentManagementService service;
+    private final JsonMapper json;
     private final Clock clock;
 
-    public AgentManagementController(AgentManagementService service, Clock clock) {
+    public AgentManagementController(AgentManagementService service, JsonMapper json, Clock clock) {
         this.service = service;
+        this.json = json;
         this.clock = clock;
+    }
+
+    private AgentResponse toResponse(Agent a) {
+        return new AgentResponse(a.id(), a.homeId(), a.name(), a.hostname(), a.os(), a.arch(), a.agentVersion(),
+                a.status().name(), a.enrolledAt(), a.lastSeenAt(), a.revokedAt(), a.revokeReason(),
+                AgentRuntimeService.connectivity(a, clock.instant()), a.lastHeartbeatAt(), parse(a.capabilitiesJson()),
+                parse(a.interfacesJson()), a.queueDepth(), a.uptimeSeconds(), a.lastError());
+    }
+
+    private JsonNode parse(String value) {
+        return value == null ? null : json.readTree(value);
     }
 
     @PostMapping("/api/v1/homes/{homeId}/agent-enrollment-tokens")
@@ -81,18 +99,25 @@ public class AgentManagementController {
 
     @GetMapping("/api/v1/homes/{homeId}/agents")
     public List<AgentResponse> agents(@PathVariable UUID homeId) {
-        return service.agentsOfHome(homeId).stream().map(AgentResponse::of).toList();
+        return service.agentsOfHome(homeId).stream().map(this::toResponse).toList();
     }
 
     @GetMapping("/api/v1/agents/{agentId}")
     public AgentResponse agent(@PathVariable UUID agentId) {
-        return AgentResponse.of(service.agent(agentId));
+        return toResponse(service.agent(agentId));
     }
 
     @PostMapping("/api/v1/agents/{agentId}/revoke")
     public AgentResponse revoke(@PathVariable UUID agentId,
             @Valid @RequestBody(required = false) RevokeAgentRequest request, HttpServletRequest http) {
         String reason = request == null ? null : request.reason();
-        return AgentResponse.of(service.revoke(agentId, reason, ClientInfo.from(http)));
+        return toResponse(service.revoke(agentId, reason, ClientInfo.from(http)));
+    }
+
+    /** Most recent events delivered by the agent (newest first). */
+    @GetMapping("/api/v1/agents/{agentId}/events")
+    public List<AgentEventResponse> events(@PathVariable UUID agentId) {
+        return service.events(agentId).stream().map(e -> new AgentEventResponse(e.eventId(), e.type(), e.occurredAt(),
+                e.receivedAt(), parse(e.detailJson()))).toList();
     }
 }

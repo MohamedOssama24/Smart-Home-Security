@@ -47,5 +47,27 @@ public enum AuditAction {
     NETWORK_UPDATED,
     NETWORK_DELETED,
     NETWORK_AUTHORIZED,
-    NETWORK_AUTHORIZATION_REVOKED
+    NETWORK_AUTHORIZATION_REVOKED,
+    SCAN_REQUESTED,
+    SCAN_CANCEL_REQUESTED,
+    SCAN_RESULTS_OUT_OF_SCOPE,
+    // Milestone 8: fingerprinting and classification
+    DEVICE_CATEGORY_CHANGED,
+    OUI_REGISTRY_SYNCED,
+    // Milestone 10: security analysis
+    VULNERABILITY_FEEDS_SYNC_REQUESTED,
+    VULNERABILITY_FEEDS_SYNCED,
+    FINDING_STATUS_CHANGED,
+    // Milestone 13: reports
+    REPORT_REQUESTED,
+    REPORT_DOWNLOADED,
+    PUSH_DEVICE_REGISTERED,
+    PUSH_DEVICE_REMOVED,
+    // Milestone 16: AI assistant (the question text is never audited)
+    ASSISTANT_QUERY,
+    // Milestone 17: SaaS billing (Stripe) and white label
+    BILLING_CHECKOUT_STARTED,
+    BILLING_PORTAL_OPENED,
+    SUBSCRIPTION_CHANGED,
+    BRANDING_UPDATED
 }

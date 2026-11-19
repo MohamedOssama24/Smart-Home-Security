@@ -27,10 +27,10 @@ import jakarta.validation.constraints.Size;
 public class TenancyController {
 
     public record PlanResponse(String code, Integer maxHomes, Integer maxUsers, Integer maxCustomers,
-            Integer maxNetworksPerHome) {
+            Integer maxNetworksPerHome, Integer maxAgentsPerHome, Integer maxScansPerDay) {
         static PlanResponse of(Plan plan) {
             return new PlanResponse(plan.code(), plan.maxHomes(), plan.maxUsers(), plan.maxCustomers(),
-                    plan.maxNetworksPerHome());
+                    plan.maxNetworksPerHome(), plan.maxAgentsPerHome(), plan.maxScansPerDay());
         }
     }
 

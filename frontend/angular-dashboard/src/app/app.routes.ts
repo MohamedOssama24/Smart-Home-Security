@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/auth/auth.guards';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'homes' },
+  { path: '', pathMatch: 'full', redirectTo: 'overview' },
   {
     path: 'login',
     canActivate: [guestGuard],
@@ -37,6 +37,63 @@ export const routes: Routes = [
     loadComponent: () => import('./features/homes/home-detail.page').then((m) => m.HomeDetailPage),
   },
   {
+    path: 'homes/:id/scans',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/scans/scans.page').then((m) => m.ScansPage),
+  },
+  {
+    path: 'homes/:id/devices',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/devices/devices.page').then((m) => m.DevicesPage),
+  },
+  {
+    path: 'homes/:id/findings',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/findings/findings.page').then((m) => m.FindingsPage),
+  },
+  {
+    path: 'homes/:id/risk',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/risk/risk.page').then((m) => m.RiskPage),
+  },
+  {
+    path: 'overview',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/overview/overview.page').then((m) => m.OverviewPage),
+  },
+  {
+    path: 'homes/:id/vulnerabilities',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/vulnerabilities/vulnerabilities.page').then((m) => m.VulnerabilitiesPage),
+  },
+  {
+    path: 'homes/:id/network-map',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/network-map/network-map.page').then((m) => m.NetworkMapPage),
+  },
+  {
+    path: 'alerts',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/alerts/alerts.page').then((m) => m.AlertsPage),
+  },
+  {
+    path: 'alerts/preferences',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/alerts/alert-preferences.page').then((m) => m.AlertPreferencesPage),
+  },
+  {
+    path: 'homes/:id/reports',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/reports/reports.page').then((m) => m.ReportsPage),
+  },
+  {
+    path: 'homes/:id/assistant',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/assistant/assistant.page').then((m) => m.AssistantPage),
+  },
+  {
     path: 'accept-invitation',
     loadComponent: () => import('./features/auth/accept-invitation.page').then((m) => m.AcceptInvitationPage),
   },
@@ -54,6 +111,11 @@ export const routes: Routes = [
     path: 'organization',
     canActivate: [authGuard],
     loadComponent: () => import('./features/organization/organization.page').then((m) => m.OrganizationPage),
+  },
+  {
+    path: 'billing',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/billing/billing.page').then((m) => m.BillingPage),
   },
   {
     path: 'account',

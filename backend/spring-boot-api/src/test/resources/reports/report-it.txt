@@ -1,0 +1,50 @@
+Rapporto di sicurezza
+Abitazione: Casa MOCK
+Generato il 18/11/2026 11:15 (Europe/Rome)
+Scansione: Standard (porte comuni), completata il 18/11/2026 11:00 (Europe/Rome)
+Riepilogo
+58
+Punteggio di sicurezza: 58/100 - Rischio alto (Scarso)
+Il punteggio va da 0 a 100: 100 significa che non sono stati trovati problemi noti. Dipende da ciò che la
+scansione ha potuto controllare, per questo è sempre accompagnato dalla copertura.
+Copertura dell'analisi: 60% (3 dispositivi analizzati su 4 trovati)
+Punteggio provvisorio: la copertura è bassa, quindi potrebbero esserci rischi non rilevati.
+Problemi aperti: 1 critici, 1 alti, 0 medi, 0 bassi, 0 informativi.
+Problemi segnati come rischio accettato (non conteggiati nel punteggio): 1.
+I problemi sono riportati nello stato in cui erano al momento della generazione del rapporto.
+Problemi da risolvere
+CVE-2099-3001 in MOCK rtspd 1.0
+Gravità: Critica - Vulnerabilità confermata - Stato: Preso in carico
+Dispositivo: mock-camera (192.168.90.30)
+Cosa significa: La versione dichiarata dal servizio rientra in una vulnerabilità nota.
+Cosa fare: Aggiorna il firmware o il software del dispositivo all'ultima versione disponibile; se non ci sono
+aggiornamenti, limita l'accesso al servizio.
+Telnet attivo sulla porta 23
+Gravità: Alta - Configurazione sospetta - Stato: Aperto
+Dispositivo: mock-router (192.168.90.1)
+Cosa significa: Telnet trasmette password e comandi in chiaro: chi è sulla stessa rete può leggerli. È anche un
+bersaglio comune dei malware per dispositivi IoT.
+Cosa fare: Disattiva Telnet dalle impostazioni del dispositivo e usa SSH o l'app ufficiale. Se non è possibile,
+aggiorna il firmware o valuta la sostituzione.
+Dispositivi trovati (4)
+Nome Indirizzo IP Categoria Produttore
+mock-router 192.168.90.1 Router MOCK Networks
+mock-camera 192.168.90.30 Videocamera IP -
+tv-?-? 192.168.90.40 Smart TV MOCK ? TV
+a-very-long-hostname-without-spaces-tha
+t-does-not-fit-the-column.mock.example.t
+est
+192.168.90.41 Non identificato -
+Limiti dell'analisi
+- L'analisi vede solo le reti a cui è collegato l'agent: reti separate (ospiti, VLAN, IoT) non sono controllate se l'agent
+non è presente.
+- I dispositivi spenti, in standby o isolati dal Wi-Fi possono non rispondere durante la scansione.
+Smart Home Security Check - Casa MOCK - pagina 1 di 2
+- Dispositivi Zigbee, Z-Wave, Bluetooth e Thread non sono visibili: non usano la rete IP.
+- Modello e versione del firmware spesso non sono esposti: in questi casi un problema è indicato come potenziale e
+non come confermato. Le informazioni dichiarate dai dispositivi possono essere inesatte.
+- Dall'interno della casa non è possibile sapere con certezza cosa è raggiungibile da Internet: sono note solo le
+aperture automatiche (UPnP) dichiarate dal router.
+- La scansione non prova password, non sfrutta vulnerabilità e non modifica i dispositivi: un risultato pulito non
+garantisce l'assenza di rischi.
+Smart Home Security Check - Casa MOCK - pagina 2 di 2

@@ -18,6 +18,8 @@ import com.shsc.agents.auth.AgentAuthService.IssuedAgentToken;
 import com.shsc.homes.HomeRepository.Home;
 import com.shsc.shared.web.ClientInfo;
 
+import com.shsc.scans.JobSigner;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -39,7 +41,8 @@ public class AgentController {
             @NotBlank @Size(max = 64) @Pattern(regexp = "[0-9A-Za-z.+_-]+") String agentVersion) {
     }
 
-    public record EnrollResponse(UUID agentId, UUID homeId, UUID credentialId) {
+    /** {@code jobSigningKey}: public key that signs the scan jobs, pinned by the agent. */
+    public record EnrollResponse(UUID agentId, UUID homeId, UUID credentialId, String jobSigningKey) {
     }
 
     public record TokenRequest(@NotBlank @Size(max = 4096) String assertion) {
@@ -55,13 +58,15 @@ public class AgentController {
     }
 
     public record SessionResponse(UUID agentId, UUID homeId, String homeName, UUID credentialId,
-            Instant tokenExpiresAt) {
+            Instant tokenExpiresAt, String jobSigningKey) {
     }
 
     private final AgentAuthService agentAuth;
+    private final JobSigner jobSigner;
 
-    public AgentController(AgentAuthService agentAuth) {
+    public AgentController(AgentAuthService agentAuth, JobSigner jobSigner) {
         this.agentAuth = agentAuth;
+        this.jobSigner = jobSigner;
     }
 
     @PostMapping("/enroll")
@@ -70,7 +75,8 @@ public class AgentController {
         Enrolled enrolled = agentAuth.enroll(new EnrollmentRequest(request.enrollmentToken(), request.publicKey(),
                 request.name(), request.hostname(), request.os(), request.arch(), request.agentVersion()),
                 ClientInfo.from(http));
-        return new EnrollResponse(enrolled.agentId(), enrolled.homeId(), enrolled.credentialId());
+        return new EnrollResponse(enrolled.agentId(), enrolled.homeId(), enrolled.credentialId(),
+                jobSigner.publicKey());
     }
 
     @PostMapping("/token")
@@ -84,7 +90,7 @@ public class AgentController {
     public SessionResponse session(@AuthenticationPrincipal AgentPrincipal agent) {
         Home home = agentAuth.requireHome(agent);
         return new SessionResponse(agent.agentId(), home.id(), home.name(), agent.credentialId(),
-                agent.tokenExpiresAt());
+                agent.tokenExpiresAt(), jobSigner.publicKey());
     }
 
     @PostMapping("/credentials/rotate")

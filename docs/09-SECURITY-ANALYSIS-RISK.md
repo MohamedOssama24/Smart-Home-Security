@@ -1,5 +1,9 @@
 # 09 — Security Analysis Engine, Vulnerability Intelligence, Risk Engine
 
+> **Implementazione (M10)**: §1–2 in [19-SECURITY-ANALYSIS.md](19-SECURITY-ANALYSIS.md). Differenze: sincronizzazione solo su richiesta e limitata al dizionario CPE (ADR-054), matching con dizionario curato (ADR-055), catalogo regole (SNMP, UPnP IGD, DNS, firmware, nuovo dispositivo: ADR-056), nessuna rianalisi delle scansioni passate (ADR-057). Il §3 (Risk Engine) è della M11.
+>
+> **Implementazione (M11)**: §3 in [20-RISK-ENGINE.md](20-RISK-ENGINE.md). Differenze: giudizio `rating` separato dal livello (ADR-060), input della copertura e assenza del profilo `DEEP` (ADR-061), doppio peso KEV mantenuto (ADR-062), snapshot `TRIAGE`, punteggio nullo per `DISCOVERY` e arrotondamento per difetto (ADR-063).
+
 ## 1. Security Analysis Engine (backend)
 Input: dispositivi + porte + servizi + protocolli + evidenze locali dell'agent. Output: `findings` con evidenze. Il motore è un insieme di **regole versionate** (classi Java piccole, una per regola, con test dedicato) eseguite dopo il fingerprinting. Ri-eseguibile su una scansione passata (`analysis_version`).
 
