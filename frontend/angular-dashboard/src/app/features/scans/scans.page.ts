@@ -7,6 +7,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { LocalizedDatePipe } from '../../core/i18n/localized-date.pipe';
 import {
   ACTIVE_SCAN_STATUSES,
+  DeletedCounts,
   GatewayDevice,
   HomeAssistantInventory,
   OpenPort,
@@ -213,11 +214,38 @@ export const SCAN_POLL_MS = 3000;
                 <td>{{ 'scans.devicesFound' | transloco: { count: s.devicesDiscovered } }}</td>
                 <td>
                   <button type="button" (click)="select(s)" [disabled]="busy()">{{ 'scans.show' | transloco }}</button>
+                  @if (canDelete() && !isActive(s)) {
+                    @if (confirmDelete() === s.id) {
+                      <span class="alert error" role="alert">{{ 'scans.deleteWarning' | transloco }}</span>
+                      <button type="button" class="danger" [attr.data-testid]="'delete-confirm-' + s.id" (click)="remove(s)" [disabled]="busy()">
+                        {{ 'scans.deleteConfirm' | transloco }}</button>
+                      <button type="button" (click)="confirmDelete.set(null)" [disabled]="busy()">{{ 'scans.keep' | transloco }}</button>
+                    } @else {
+                      <button type="button" [attr.data-testid]="'delete-' + s.id" (click)="confirmDelete.set(s.id)" [disabled]="busy()">
+                        {{ 'scans.delete' | transloco }}</button>
+                    }
+                  }
                 </td>
               </tr>
             }
           </tbody>
         </table>
+      }
+      @if (deletedInfo(); as info) {
+        <div class="alert success" role="status" data-testid="deleted-info">{{ 'scans.deleted' | transloco: info }}</div>
+      }
+      @if (canDelete() && history().length > 0 && !active()) {
+        <h3>{{ 'scans.clearTitle' | transloco }}</h3>
+        <p class="muted small">{{ 'scans.clearHint' | transloco }}</p>
+        @if (confirmClear()) {
+          <div class="alert error" role="alert">{{ 'scans.clearWarning' | transloco }}</div>
+          <button type="button" class="danger" data-testid="clear-confirm" (click)="clearHome()" [disabled]="busy()">
+            {{ 'scans.clearConfirm' | transloco }}</button>
+          <button type="button" (click)="confirmClear.set(false)" [disabled]="busy()">{{ 'scans.keep' | transloco }}</button>
+        } @else {
+          <button type="button" data-testid="clear-home" (click)="confirmClear.set(true)" [disabled]="busy()">
+            {{ 'scans.clear' | transloco }}</button>
+        }
       }
     </section>
   `,
@@ -243,6 +271,39 @@ export class ScansPage implements OnInit, OnDestroy {
   private timer: ReturnType<typeof setTimeout> | null = null;
   /** Same key until the request succeeds: a double click or a retry cannot start two scans. */
   private pendingKey: string | null = null;
+
+  /** Two-step confirmation: id of the scan being deleted, or the whole inventory. */
+  readonly confirmDelete = signal<string | null>(null);
+  readonly confirmClear = signal(false);
+  readonly deletedInfo = signal<DeletedCounts | null>(null);
+
+  canDelete(): boolean {
+    return this.auth.hasPermission('scan:delete');
+  }
+
+  isActive(scan: Scan): boolean {
+    return ACTIVE_SCAN_STATUSES.includes(scan.status);
+  }
+
+  async remove(scan: Scan): Promise<void> {
+    await this.run(async () => {
+      this.deletedInfo.set(await firstValueFrom(this.api.remove(scan.id)));
+      this.confirmDelete.set(null);
+      if (this.selected()?.id === scan.id) {
+        this.selected.set(null);
+      }
+      await this.refresh();
+    });
+  }
+
+  async clearHome(): Promise<void> {
+    await this.run(async () => {
+      this.deletedInfo.set(await firstValueFrom(this.api.clearHome(this.homeId())));
+      this.confirmClear.set(false);
+      this.selected.set(null);
+      await this.refresh();
+    });
+  }
 
   canCreate(): boolean {
     return this.auth.hasPermission('scan:create');

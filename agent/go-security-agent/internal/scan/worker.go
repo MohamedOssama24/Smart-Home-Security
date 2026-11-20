@@ -16,6 +16,7 @@ import (
 	"shsc/agent/internal/cloud"
 	"shsc/agent/internal/discovery"
 	"shsc/agent/internal/homeassistant"
+	"shsc/agent/internal/identities"
 	"shsc/agent/internal/portscan"
 	"shsc/agent/internal/queue"
 )
@@ -41,6 +42,8 @@ const (
 
 const (
 	maxBatch            = 500
+	maxIconsPerBatch    = 16 // 16 × 32 KB in base64 stays well below the 4 MB request limit
+	maxIconsPerScan     = 64
 	defaultPollWait     = 20 * time.Second
 	defaultProgressTick = 5 * time.Second
 	minBackoff          = time.Second
@@ -70,8 +73,12 @@ type Options struct {
 	Discover  Discoverer
 	ScanPorts PortScanner
 	Gateways  GatewayReader
-	PollWait  time.Duration
-	Now       func() time.Time
+	// Identities reads who uses the addresses of the job (M24); Firewall is the table filled by
+	// the Sophos syslog listener (nil: not running).
+	Identities IdentityReader
+	Firewall   *identities.Table
+	PollWait   time.Duration
+	Now        func() time.Time
 }
 
 // Worker receives and executes scan jobs. It runs next to the heartbeat loop.
@@ -100,6 +107,9 @@ func New(o Options) *Worker {
 	}
 	if o.Gateways == nil {
 		o.Gateways = gatewayReader(o.Auth.Store, o.Logger, o.Now)
+	}
+	if o.Identities == nil {
+		o.Identities = identityReader(o.Auth.Store, o.Firewall, identities.ReadDirectory, o.Logger, o.Now)
 	}
 	if o.Auth.Now == nil {
 		o.Auth.Now = o.Now
@@ -279,6 +289,12 @@ func (w *Worker) execute(ctx context.Context, job Job) error {
 		inventory, haWarnings = w.o.Gateways(runCtx, job)
 		warnings = append(warnings, haWarnings...)
 	}
+	var people []identities.Identity
+	if runCtx.Err() == nil {
+		var idWarnings []string
+		people, idWarnings = w.o.Identities(runCtx, job)
+		warnings = append(warnings, idWarnings...)
+	}
 	outcome := OutcomeCompleted
 	mu.Lock()
 	cancelledByUser := userCancel
@@ -294,7 +310,7 @@ func (w *Worker) execute(ctx context.Context, job Job) error {
 	cancel()
 	<-reportsEnded
 
-	if err := w.enqueueResults(job, observations, ports, inventory, warnings, outcome); err != nil {
+	if err := w.enqueueResults(job, observations, ports, inventory, people, warnings, outcome); err != nil {
 		log.Error("cannot queue the scan results", "error", err.Error())
 		return err
 	}
@@ -316,7 +332,7 @@ type upload struct {
 
 // enqueueResults writes every batch and then the completion to the persistent queue.
 func (w *Worker) enqueueResults(job Job, obs []discovery.Observation, ports []portscan.Result,
-	inventory *homeassistant.Inventory, warnings []string, outcome string) error {
+	inventory *homeassistant.Inventory, people []identities.Identity, warnings []string, outcome string) error {
 	ctx := context.Background() // must be written even while stopping
 	batches := 0
 	for start := 0; ; start += maxBatch {
@@ -350,10 +366,38 @@ func (w *Worker) enqueueResults(job Job, obs []discovery.Observation, ports []po
 		}
 		batches++
 	}
+	// M23: device icons in their own small batches (at most maxIconsPerScan per scan)
+	var icons []cloud.DeviceIcon
+	for _, o := range obs {
+		if o.Icon != nil && len(icons) < maxIconsPerScan {
+			icons = append(icons, cloud.DeviceIcon{IP: o.IP.String(), Origin: o.Icon.Origin,
+				ContentType: o.Icon.ContentType, Width: o.Icon.Width, Height: o.Icon.Height, Data: o.Icon.Data,
+				ObservedAt: o.ObservedAt})
+		}
+	}
+	for start := 0; start < len(icons); start += maxIconsPerBatch {
+		end := min(start+maxIconsPerBatch, len(icons))
+		u := upload{Op: "results", ScanID: job.ScanID, Batch: &cloud.ResultsBatch{SchemaVersion: cloud.SchemaVersion,
+			BatchSeq: batches, Observations: []cloud.Observation{}, Icons: icons[start:end]}}
+		if err := w.enqueue(ctx, fmt.Sprintf("%s/results/%d", job.ScanID, batches), u); err != nil {
+			return err
+		}
+		batches++
+	}
 	// the Home Assistant inventory travels in its own batch (docs/24 §3)
 	if inventory != nil {
 		u := upload{Op: "results", ScanID: job.ScanID, Batch: &cloud.ResultsBatch{SchemaVersion: cloud.SchemaVersion,
 			BatchSeq: batches, Observations: []cloud.Observation{}, HomeAssistant: homeAssistantBatch(*inventory)}}
+		if err := w.enqueue(ctx, fmt.Sprintf("%s/results/%d", job.ScanID, batches), u); err != nil {
+			return err
+		}
+		batches++
+	}
+	// M24: who uses which address, in its own batches after the hosts
+	for start := 0; start < len(people); start += maxBatch {
+		end := min(start+maxBatch, len(people))
+		u := upload{Op: "results", ScanID: job.ScanID, Batch: &cloud.ResultsBatch{SchemaVersion: cloud.SchemaVersion,
+			BatchSeq: batches, Observations: []cloud.Observation{}, Identities: identityBatch(people[start:end])}}
 		if err := w.enqueue(ctx, fmt.Sprintf("%s/results/%d", job.ScanID, batches), u); err != nil {
 			return err
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/netip"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -172,7 +173,12 @@ func (a *mdnsAnswers) parse(src netip.Addr, packet []byte) {
 		switch body := r.Body.(type) {
 		case *dnsmessage.PTRResource:
 			target := body.PTR.String()
-			if strings.EqualFold(name, "_services._dns-sd._udp.local.") {
+			if strings.HasSuffix(strings.ToLower(name), ".in-addr.arpa.") {
+				// answer to the unicast reverse query (M23): the name the host gives itself
+				if host.hostname == "" && strings.HasSuffix(strings.ToLower(target), ".local.") {
+					host.hostname = trimLocal(target)
+				}
+			} else if strings.EqualFold(name, "_services._dns-sd._udp.local.") {
 				if len(a.types) < 64 && strings.HasSuffix(target, ".local.") {
 					a.types[strings.ToLower(target)] = true
 				}
@@ -183,8 +189,9 @@ func (a *mdnsAnswers) parse(src netip.Addr, packet []byte) {
 			if s := service(name); s != nil {
 				s.Port = int(body.Port)
 			}
-			if host.hostname == "" {
-				host.hostname = trimLocal(body.Target.String())
+			if target := trimLocal(body.Target.String()); host.hostname == "" ||
+				(generatedName(host.hostname) && !generatedName(target)) {
+				host.hostname = target
 			}
 		case *dnsmessage.TXTResource:
 			for _, kv := range body.TXT {
@@ -195,8 +202,11 @@ func (a *mdnsAnswers) parse(src netip.Addr, packet []byte) {
 			}
 		case *dnsmessage.AResource:
 			ip := netip.AddrFrom4(body.A)
-			if ip == src || host.hostname == "" {
-				host.hostname = trimLocal(name)
+			// the record of the responder's own address names it, but a readable name is never
+			// replaced by a generated one (e.g. the UUID a Cast service uses as host name)
+			if n := trimLocal(name); host.hostname == "" ||
+				(ip == src && (!generatedName(n) || generatedName(host.hostname))) {
+				host.hostname = n
 			}
 			host.addresses[ip] = true
 		case *dnsmessage.AAAAResource:
@@ -237,6 +247,13 @@ func (a *mdnsAnswers) observations() []Observation {
 		}
 	}
 	return out
+}
+
+var generatedNameRe = regexp.MustCompile(`^(?i)[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$|^[0-9a-f]{24,}$`)
+
+// generatedName: a UUID or long hex identifier used as host name, not a name for people.
+func generatedName(s string) bool {
+	return generatedNameRe.MatchString(s)
 }
 
 // serviceType extracts "_ipp._tcp" from "Printer._ipp._tcp.local.".

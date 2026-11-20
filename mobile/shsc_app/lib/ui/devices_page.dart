@@ -18,6 +18,9 @@ IconData categoryIcon(String category) => switch (category) {
       'SMART_PLUG' => Icons.power,
       'SMART_SPEAKER' => Icons.speaker,
       'IOT' => Icons.sensors,
+      'VOIP_PHONE' => Icons.phone_in_talk,
+      'NETWORK_DEVICE' => Icons.hub,
+      'SERVER' => Icons.dns,
       _ => Icons.device_unknown,
     };
 

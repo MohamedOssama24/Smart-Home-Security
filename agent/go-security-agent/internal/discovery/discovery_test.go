@@ -79,9 +79,31 @@ func fakeTechniques(netbiosHosts *[]netip.Addr, routerCalled *bool) *techniques 
 			emit(Observation{IP: ip("203.0.113.9"), Method: MethodSSDP})
 			return nil
 		},
+		ssdpUni: func(_ context.Context, _ Network, hosts []netip.Addr, emit func(Observation)) []string {
+			for _, h := range hosts {
+				if h == ip("192.168.50.1") {
+					panic("host that already answered SSDP asked again")
+				}
+			}
+			emit(Observation{IP: ip("203.0.113.10"), Method: MethodSSDP}) // outside the targets: dropped
+			return nil
+		},
+		mdnsUni: func(_ context.Context, _ Network, hosts []netip.Addr, emit func(Observation)) []string {
+			for _, h := range hosts {
+				if h == ip("192.168.50.20") {
+					panic("host that already answered mDNS asked again")
+				}
+			}
+			emit(Observation{IP: ip("203.0.113.11"), Method: MethodMDNS}) // outside the targets: dropped
+			return nil
+		},
 		ndp: func(_ context.Context, _ Network, emit func(Observation)) []string {
 			emit(Observation{IP: ip("fd00::30"), Method: MethodNDP, MAC: "aa:bb:cc:00:00:30"})
 			emit(Observation{IP: ip("2001:db8::1"), Method: MethodNDP})
+			// global neighbours (MOCK): attached to fd00::30 by MAC, or dropped without an in-scope MAC
+			emit(Observation{IP: ip("2001:db8::30"), Method: methodGlobalNeighbour, MAC: "AA:BB:CC:00:00:30"})
+			emit(Observation{IP: ip("2001:db8::99"), Method: methodGlobalNeighbour, MAC: "aa:bb:cc:00:00:99"})
+			emit(Observation{IP: ip("fd00:1::5"), Method: methodGlobalNeighbour, MAC: "aa:bb:cc:00:00:30"})
 			return []string{WarnNDPTableOnly}
 		},
 		netbios: func(_ context.Context, _ Network, hosts []netip.Addr, emit func(Observation)) []string {
@@ -141,6 +163,12 @@ func TestRunMergesAllMethodsAndKeepsOnlyAuthorizedAddresses(t *testing.T) {
 	if len(obs) != 11+5 { // + reverse DNS of the other hosts found (.1, .20, .40, fd00::20, fd00::30)
 		t.Errorf("unexpected observation count %d: %+v", len(obs), obs)
 	}
+	if g := got[key{"fd00::30", MethodNDP}].Details[DetailGlobalIPv6]; !slices.Equal(g.([]string), []string{"2001:db8::30"}) {
+		t.Errorf("global IPv6 of fd00::30: %v", g)
+	}
+	if got[key{"fd00::20", MethodMDNS}].Details[DetailGlobalIPv6] != nil {
+		t.Error("global IPv6 attached without a MAC")
+	}
 	if got[key{"192.168.50.10", MethodICMP}].Details["ttl"] != 64 || got[key{"192.168.50.20", MethodMDNS}].Hostname != "printer" {
 		t.Error("details or hostname lost")
 	}
@@ -186,5 +214,19 @@ func TestRouterConfigRefusesDefaultCommunities(t *testing.T) {
 		AuthPassword: "a", PrivProtocol: "AES", PrivPassword: "p"}}
 	if err := ok.Validate(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestGlobalNeighboursAreOnlyRecorded(t *testing.T) {
+	n := Network{Target: netip.MustParsePrefix("fd00::/64")}
+	mac, _ := net.ParseMAC("aa:bb:cc:00:00:30")
+	var got []Observation
+	emit := func(o Observation) { got = append(got, o) }
+	emitNeighbour(n, neighbour{ip: netip.MustParseAddr("2001:db8::30"), mac: mac}, emit)
+	emitNeighbour(n, neighbour{ip: netip.MustParseAddr("2001:db8::31")}, emit)            // no MAC
+	emitNeighbour(n, neighbour{ip: netip.MustParseAddr("fd00:1::30"), mac: mac}, emit)    // ULA outside the target
+	emitNeighbour(n, neighbour{ip: netip.MustParseAddr("fe80::30%eth0"), mac: mac}, emit) // link-local
+	if len(got) != 1 || got[0].Method != methodGlobalNeighbour || got[0].IP.String() != "2001:db8::30" {
+		t.Fatalf("unexpected %+v", got)
 	}
 }

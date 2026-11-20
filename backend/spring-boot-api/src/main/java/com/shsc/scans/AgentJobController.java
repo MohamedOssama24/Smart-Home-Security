@@ -17,10 +17,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.shsc.people.PeopleRepository.ScanIdentity;
 import com.shsc.agents.auth.AgentPrincipal;
 import com.shsc.integrations.HomeAssistantRepository.GatewayDevice;
 import com.shsc.integrations.HomeAssistantRepository.Inventory;
 import com.shsc.shared.web.ApiException;
+import com.shsc.devices.images.ImageFormat;
+import com.shsc.devices.images.DeviceImageRepository.ScanIcon;
 import com.shsc.scans.AgentJobService.BatchAck;
 import com.shsc.scans.AgentJobService.CompleteAck;
 import com.shsc.scans.AgentJobService.Lease;
@@ -122,8 +125,34 @@ public class AgentJobController {
             @NotNull @Min(0) @Max(9999) Integer batchSeq,
             @NotNull @Size(max = 500) List<@NotNull @Valid ObservationItem> observations,
             @Size(max = 500) List<@NotNull @Valid PortItem> ports,
-            @Valid HomeAssistantItem homeAssistant) {
+            @Valid HomeAssistantItem homeAssistant,
+            @Size(max = 16) List<@NotNull @Valid IconItem> icons,
+            @Size(max = 500) List<@NotNull @Valid IdentityItem> identities) {
     }
+
+    /**
+     * Account seen on an address of the home (M24, ADR-083): DIRECTORY from the Active Directory
+     * logons, FIREWALL from the Sophos authentications read by the agent.
+     */
+    public record IdentityItem(
+            @NotNull @Size(min = 2, max = 45) @Pattern(regexp = "[0-9a-fA-F.:]+") String ip,
+            @NotNull @Size(min = 1, max = 100) @Pattern(regexp = "[^\\p{Cntrl}\\\\@]+") String account,
+            @NotNull @Pattern(regexp = "DIRECTORY|FIREWALL") String source,
+            @NotNull Instant observedAt) {
+    }
+
+    /** Icon a device declares about itself (M23, ADR-077); data: base64 of a PNG or JPEG of at most 32 KB. */
+    public record IconItem(
+            @NotNull @Size(min = 2, max = 45) @Pattern(regexp = "[0-9a-fA-F.:]+") String ip,
+            @NotNull @Pattern(regexp = "UPNP") String origin,
+            @NotNull @Pattern(regexp = "image/png|image/jpeg") String contentType,
+            @Min(1) @Max(1024) Integer width,
+            @Min(1) @Max(1024) Integer height,
+            @NotNull @Size(min = 1, max = MAX_ICON_BYTES) byte[] data,
+            @NotNull Instant observedAt) {
+    }
+
+    static final int MAX_ICON_BYTES = 32 * 1024;
 
     public record CompleteRequest(
             @NotNull @Min(SCHEMA_MIN) @Max(SCHEMA_MAX) Integer schemaVersion,
@@ -190,7 +219,37 @@ public class AgentJobController {
         if (ha != null && !ports.isEmpty()) {
             throw ApiException.badRequest("INVALID_BATCH", "The Home Assistant inventory travels in its own batch.");
         }
-        return jobs.results(agent, scanId, request.batchSeq(), observations, ports, inventory, raw);
+        // M23: icons travel in their own batches; each one must really be a small PNG or JPEG
+        List<ScanIcon> icons = new java.util.ArrayList<>();
+        if (request.icons() != null && !request.icons().isEmpty()) {
+            if (ha != null || !ports.isEmpty() || !observations.isEmpty()) {
+                throw ApiException.badRequest("INVALID_BATCH", "Device icons travel in their own batch.");
+            }
+            for (IconItem i : request.icons()) {
+                ImageFormat.Info info = ImageFormat.inspect(i.data(), MAX_ICON_BYTES, 1024)
+                        .filter(f -> f.contentType().equals(i.contentType()))
+                        .orElseThrow(() -> ApiException.badRequest("INVALID_ICON",
+                                "A device icon is not a PNG or JPEG of at most 32 KB and 1024 pixels."));
+                icons.add(new ScanIcon(i.ip(), i.origin(), info, i.data(), i.observedAt()));
+            }
+            raw = json.writeValueAsString(Map.of("observations", request.observations(), "icons", request.icons()));
+        }
+        // M24: identities travel in their own batches
+        List<ScanIdentity> identities = new java.util.ArrayList<>();
+        if (request.identities() != null && !request.identities().isEmpty()) {
+            if (ha != null || !ports.isEmpty() || !observations.isEmpty() || !icons.isEmpty()) {
+                throw ApiException.badRequest("INVALID_BATCH", "The identities travel in their own batch.");
+            }
+            for (IdentityItem i : request.identities()) {
+                if (i.account().isBlank()) {
+                    throw ApiException.badRequest("INVALID_IDENTITY", "An identity has no account.");
+                }
+                identities.add(new ScanIdentity(i.ip(), i.account().strip(), i.source(), i.observedAt()));
+            }
+            raw = json.writeValueAsString(Map.of("observations", request.observations(),
+                    "identities", request.identities()));
+        }
+        return jobs.results(agent, scanId, request.batchSeq(), observations, ports, inventory, icons, identities, raw);
     }
 
     private static String blank(String s) {

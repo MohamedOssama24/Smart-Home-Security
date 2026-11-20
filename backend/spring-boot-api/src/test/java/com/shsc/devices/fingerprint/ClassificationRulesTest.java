@@ -76,6 +76,87 @@ class ClassificationRulesTest {
     }
 
     @Test
+    void aTvNamingItsPlatformOverMdnsIsASmartTv() {
+        // [MOCK] like an LG webOS TV: Chromecast + AirPlay alone (same source) were not enough
+        Classification c = classify("MOCK Visionscape", arp("192.168.1.40"),
+                mdns("192.168.1.40", "LGwebOSTV", List.of("_googlecast._tcp", "_airplay._tcp"),
+                        Map.of("fn", "[LG] webOS TV MOCK55", "md", "MOCK55", "manufacturer", "LG")));
+        assertThat(c.category()).isEqualTo(DeviceCategory.SMART_TV);
+        assertThat(c.matches()).extracting(m -> m.ruleId()).contains("tv.mdns-tv-os");
+    }
+
+    @Test
+    void aWindowsNameOnAPcMakerCardIsAComputerButNeitherAloneIs() {
+        Seen netbios = new Seen("NETBIOS", "192.168.1.73", null, "MOCK-PC-73", Map.of("workgroup", "WORKGROUP"));
+        Classification both = classify("Micro-Star INTL CO., LTD.", arp("192.168.1.73"), netbios);
+        assertThat(both.category()).isEqualTo(DeviceCategory.DESKTOP);
+        assertThat(both.confidence()).isEqualTo(Confidence.MEDIUM);
+
+        // 2026.11-5: a workstation name alone (any network card) is a computer, MEDIUM at most
+        Classification nameOnly = classify("Universal Global Scientific Industrial., Ltd", arp("192.168.1.93"), netbios);
+        assertThat(nameOnly.category()).isEqualTo(DeviceCategory.DESKTOP);
+        assertThat(nameOnly.confidence()).isEqualTo(Confidence.MEDIUM);
+        assertThat(classify("Micro-Star INTL CO., LTD.", arp("192.168.1.73")).category())
+                .isEqualTo(DeviceCategory.UNKNOWN_DEVICE);
+        // server, NAS and printer names are not workstation names
+        for (String name : List.of("MOCK-SERVER", "MOCK-NAS", "DISKSTATION", "RNP0026738A1B2C", "BRN30055C1A2B3C", "MOCK-DC01")) {
+            Seen other = new Seen("NETBIOS", "192.168.1.80", null, name, Map.of());
+            assertThat(classify(null, arp("192.168.1.80"), other).category()).as(name)
+                    .isNotEqualTo(DeviceCategory.DESKTOP);
+        }
+        // a server board maker or a virtual machine is not taken for a PC (tie: unknown)
+        assertThat(classify("Hewlett Packard Enterprise", arp("192.168.1.55"), netbios).category())
+                .isEqualTo(DeviceCategory.UNKNOWN_DEVICE);
+        assertThat(classify("Microsoft Corporation", arp("192.168.1.230"), netbios).category())
+                .isEqualTo(DeviceCategory.UNKNOWN_DEVICE);
+    }
+
+    @Test
+    void androidNameWithAPrivateMacIsASmartphoneAndTuyaIsIot() {
+        // [MOCK] the default Android name over mDNS, private MAC (locally administered bit set)
+        Seen privateArp = new Seen("ARP", "192.168.1.117", "e6:fd:b2:00:00:01", null, null);
+        Seen android = mdns("192.168.1.117", "Android", List.of(), Map.of());
+        Classification phone = classify(null, privateArp, android);
+        assertThat(phone.category()).isEqualTo(DeviceCategory.SMARTPHONE);
+        assertThat(phone.confidence()).isEqualTo(Confidence.MEDIUM);
+        assertThat(classify(null, privateArp, mdns("192.168.1.102", "Android-3", List.of(), Map.of())).category())
+                .isEqualTo(DeviceCategory.SMARTPHONE);
+        // the name with a maker MAC, or a private MAC alone, is not enough
+        assertThat(classify(null, arp("192.168.1.117"), android).category()).isEqualTo(DeviceCategory.UNKNOWN_DEVICE);
+        assertThat(classify(null, privateArp).category()).isEqualTo(DeviceCategory.UNKNOWN_DEVICE);
+
+        Classification tuya = classify("Tuya Smart Inc.", arp("192.168.1.51"));
+        assertThat(tuya.category()).isEqualTo(DeviceCategory.IOT);
+        assertThat(tuya.confidence()).isEqualTo(Confidence.MEDIUM);
+    }
+
+    @Test
+    void singlePurposeMakersGiveVoipPhonesAndNetworkDevicesWithMediumConfidenceAtMost() {
+        // [MOCK] the card of an IP phone maker or of a firewall maker, nothing else known
+        Classification phone = classify("YEALINK(XIAMEN) NETWORK TECHNOLOGY CO.,LTD.", arp("192.168.1.50"));
+        assertThat(phone.category()).isEqualTo(DeviceCategory.VOIP_PHONE);
+        assertThat(phone.confidence()).isEqualTo(Confidence.MEDIUM);
+        Classification firewall = classify("Sophos Ltd", arp("192.168.1.1"));
+        assertThat(firewall.category()).isEqualTo(DeviceCategory.NETWORK_DEVICE);
+        assertThat(firewall.confidence()).isEqualTo(Confidence.MEDIUM);
+        // a maker of many kinds of devices stays a weak hint
+        assertThat(classify("TP-Link Systems Inc", arp("192.168.1.61")).category())
+                .isEqualTo(DeviceCategory.UNKNOWN_DEVICE);
+    }
+
+    @Test
+    void aServerNameInWindowsNetworkingIsAServerEvenOnAPcMakerCard() {
+        Seen dc = new Seen("NETBIOS", "192.168.1.230", null, "MOCKSERVERDC", Map.of("workgroup", "MOCK"));
+        assertThat(classify("Microsoft Corporation", arp("192.168.1.230"), dc).category())
+                .isEqualTo(DeviceCategory.SERVER);
+        Seen hyperv = new Seen("NETBIOS", "192.168.1.220", null, "HYPERV-MOCK", Map.of("workgroup", "MOCK"));
+        assertThat(classify("Dell Inc.", arp("192.168.1.220"), hyperv).category()).isEqualTo(DeviceCategory.SERVER);
+        // an ordinary PC name on the same card stays a computer
+        Seen pc = new Seen("NETBIOS", "192.168.1.73", null, "DESKTOP-MOCK1", Map.of("workgroup", "MOCK"));
+        assertThat(classify("Dell Inc.", arp("192.168.1.73"), pc).category()).isEqualTo(DeviceCategory.DESKTOP);
+    }
+
+    @Test
     void twoWeakHintsAreNotEnoughEither() {
         Classification c = classify("MOCK Hikvision Digital Technology", arp("192.168.1.20"),
                 new Seen("RDNS", "192.168.1.20", null, "camera-20.lan", null));

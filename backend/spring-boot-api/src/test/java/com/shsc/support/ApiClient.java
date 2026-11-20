@@ -150,6 +150,38 @@ public class ApiClient {
         }
     }
 
+    /** Binary answer (M23 device images). */
+    public record BinaryResponse(int status, Map<String, List<String>> headers, byte[] body) {
+        public Optional<String> header(String name) {
+            return headers.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(name))
+                    .flatMap(e -> e.getValue().stream()).findFirst();
+        }
+    }
+
+    /** Sends raw bytes (null: no body) and returns the raw answer, bearer authentication only. */
+    public BinaryResponse sendBytes(String method, String path, byte[] body, String contentType) {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(base + path))
+                .header("X-Forwarded-For", ip)
+                .header("User-Agent", "shsc-tests")
+                .method(method, body == null ? HttpRequest.BodyPublishers.noBody()
+                        : HttpRequest.BodyPublishers.ofByteArray(body));
+        if (contentType != null) {
+            request.header("Content-Type", contentType);
+        }
+        if (bearer != null) {
+            request.header("Authorization", "Bearer " + bearer);
+        }
+        try {
+            HttpResponse<byte[]> response = http.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
+            return new BinaryResponse(response.statusCode(), response.headers().map(), response.body());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+    }
+
     private void storeCookies(List<String> setCookies) {
         for (String header : setCookies) {
             String[] parts = header.split(";");

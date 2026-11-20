@@ -38,7 +38,10 @@ Future<void> runAppFlow(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('open-devices')));
   await pumpUntil(tester, find.byKey(const Key('device-d1')));
   await tester.tap(find.byKey(const Key('device-d1')));
-  await pumpUntil(tester, find.byKey(const Key('port-TCP-23')));
+  await pumpUntil(tester, find.byKey(const Key('device-category')));
+  // the ports are below the identity card (M20): scroll to them
+  await tester.scrollUntilVisible(find.byKey(const Key('port-TCP-23')), 200,
+      scrollable: find.byType(Scrollable).last);
   await tester.pump(const Duration(seconds: 1)); // end of the page transition, then back
   GoRouter.of(tester.element(find.byType(Scaffold).last)).pop();
   await pumpUntil(tester, find.byKey(const Key('device-d2')));

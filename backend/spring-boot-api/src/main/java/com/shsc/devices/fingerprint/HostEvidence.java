@@ -33,6 +33,9 @@ public record HostEvidence(String mac, boolean macRandomized, List<String> addre
     /** mDNS TXT keys naming the model / the maker of the product. */
     private static final List<String> TXT_MODEL = List.of("model", "md", "usb_mdl", "product", "am", "ty");
     private static final List<String> TXT_MAKER = List.of("manufacturer", "mfg", "usb_mfg", "vendor");
+    /** mDNS TXT keys naming the firmware version (M20); generic keys such as "ver" are left out. */
+    private static final List<String> TXT_FIRMWARE = List.of("fw", "fwversion", "fw_version", "firmware",
+            "firmwareversion", "swversion", "sw_version");
     /** Methods whose host names come from the router's own tables (DHCP leases, ARP). */
     private static final Set<String> ROUTER_TABLES = Set.of("TR064", "SNMP");
 
@@ -85,6 +88,10 @@ public record HostEvidence(String mac, boolean macRandomized, List<String> addre
         if (ouiOrganization != null) {
             signals.add(new Signal("oui", ouiOrganization, "OUI"));
         }
+        if (randomized) {
+            // a private (locally administered) MAC: what phones, tablets and laptops use by default
+            signals.add(new Signal("mac.randomized", "true", "MAC"));
+        }
         return new HostEvidence(mac, randomized, addresses, methods, List.copyOf(signals), ttl, ouiOrganization);
     }
 
@@ -131,6 +138,9 @@ public record HostEvidence(String mac, boolean macRandomized, List<String> addre
                     if (TXT_MAKER.contains(k)) {
                         signals.add(new Signal("mdns.maker", value.trim(), "MDNS"));
                     }
+                    if (TXT_FIRMWARE.contains(k)) {
+                        signals.add(new Signal("mdns.firmware", value.trim(), "MDNS"));
+                    }
                     if (k.equals("osxvers")) {
                         signals.add(new Signal("mdns.osxvers", value.trim(), "MDNS"));
                     }
@@ -161,6 +171,7 @@ public record HostEvidence(String mac, boolean macRandomized, List<String> addre
                 if (p.product() != null) {
                     signals.add(new Signal("ipp.model", p.product(), "IPP"));
                 }
+                text(e, "firmware").ifPresent(v -> signals.add(new Signal("ipp.firmware", v, "IPP")));
             }
             default -> {
                 // the confirmed service itself is the evidence
@@ -182,6 +193,24 @@ public record HostEvidence(String mac, boolean macRandomized, List<String> addre
         text(d, "modelName").ifPresent(v -> signals.add(new Signal("ssdp.modelName", v, "SSDP")));
         text(d, "modelNumber").ifPresent(v -> signals.add(new Signal("ssdp.modelNumber", v, "SSDP")));
         text(d, "friendlyName").ifPresent(v -> signals.add(new Signal("ssdp.friendlyName", v, "SSDP")));
+        // non-standard elements of the UPnP descriptor used by several vendors (M20)
+        text(d, "firmwareVersion").or(() -> text(d, "softwareVersion"))
+                .ifPresent(v -> signals.add(new Signal("ssdp.firmware", v, "SSDP")));
+    }
+
+    /**
+     * The same host with the data of the Home Assistant device registry whose MACs match it
+     * (M20): manufacturer, model and software version, source HOME_ASSISTANT.
+     */
+    public HostEvidence withHomeAssistant(String manufacturer, String model, String swVersion) {
+        List<Signal> extra = new ArrayList<>(signals);
+        for (String[] f : new String[][] { { "ha.manufacturer", manufacturer }, { "ha.model", model },
+                { "ha.firmware", swVersion } }) {
+            if (f[1] != null && !f[1].isBlank()) {
+                extra.add(new Signal(f[0], f[1].trim(), "HOME_ASSISTANT"));
+            }
+        }
+        return new HostEvidence(mac, macRandomized, addresses, methods, List.copyOf(extra), ttl, ouiOrganization);
     }
 
     private static java.util.Optional<String> text(Map<String, Object> d, String key) {

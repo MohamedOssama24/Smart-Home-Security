@@ -11,6 +11,10 @@ Trasforma le osservazioni di una scansione ([16-NETWORK-DISCOVERY.md](16-NETWORK
 - Identità: `(home, MAC)`; senza MAC (host visto solo via router/IPv6) `(home, IP)`.
 - **MAC randomizzato**: bit "locally administered" (`primo ottetto & 0x02`). Marcato `mac_randomized`, **il registro OUI non viene consultato** (il prefisso non identifica un produttore). Se un altro dispositivo della stessa abitazione ha lo stesso nome, è indicato come `probable_same_as` ("probabilmente lo stesso dispositivo"): solo un'indicazione, i due record non vengono uniti.
 
+**Doppioni e dispositivi non visti** (ADR-080):
+- Un host visto senza MAC (risponde solo al ping) all'indirizzo attuale di un dispositivo con MAC è quel dispositivo. A fine scansione i dispositivi "solo indirizzo" con un gemello con MAC vengono uniti, tranne quelli con dati dell'utente.
+- I dispositivi non visti nella scansione, ma con un risultato superato (nuovo ruleset, o produttore mancante dopo l'import del registro), vengono ricalcolati dalle osservazioni della loro ultima scansione: al massimo 100 per scansione, senza traffico.
+
 ## 3. Registro OUI (IEEE)
 - Tabella globale `oui_entries` (dato pubblico, senza tenant): MA-L (24 bit), MA-M (28), MA-S (36); ricerca per prefisso più lungo.
 - **Sincronizzazione manuale**: `POST /api/v1/platform/oui/sync`, solo amministratori di piattaforma (`platform:admin`), registrata in audit (`OUI_REGISTRY_SYNCED`). Nessun job automatico.
@@ -20,7 +24,7 @@ Trasforma le osservazioni di una scansione ([16-NETWORK-DISCOVERY.md](16-NETWORK
 - Differenza da docs/07: la ricerca OUI avviene nel backend; la distribuzione di uno snapshot all'agent non serve e non è implementata.
 
 ## 4. Regole e punteggi
-Ruleset versionato in `backend/spring-boot-api/src/main/resources/fingerprint/rules.json` (versione `2026.11-1`, 47 regole; dalla M9 `2026.11-2`, 60 regole con gli indizi di porte e servizi, vedi [18-PORT-SCANNING.md](18-PORT-SCANNING.md) §7), validato all'avvio: un ruleset non valido blocca l'avvio invece di classificare male (id duplicati, regole che concludono "sconosciuto", un indizio debole che da solo raggiunge la soglia).
+Ruleset versionato in `backend/spring-boot-api/src/main/resources/fingerprint/rules.json` (versione `2026.11-1`, 47 regole; dalla M9 `2026.11-2`, 60 regole con gli indizi di porte e servizi, vedi [18-PORT-SCANNING.md](18-PORT-SCANNING.md) §7; dalla M23 `2026.11-3`, 63 regole: smart TV dal nome mDNS dichiarato e computer da NetBIOS + produttore PC, ADR-078; poi `2026.11-4`, 73 regole, con le categorie `VOIP_PHONE`, `NETWORK_DEVICE` e `SERVER`, ADR-079; poi `2026.11-5`, 77 regole: computer da nome NetBIOS, smartphone Android con MAC privato, IoT Tuya, ADR-080), validato all'avvio: un ruleset non valido blocca l'avvio invece di classificare male (id duplicati, regole che concludono "sconosciuto", un indizio debole che da solo raggiunge la soglia).
 
 | Forza | Peso | Esempi |
 |---|---|---|

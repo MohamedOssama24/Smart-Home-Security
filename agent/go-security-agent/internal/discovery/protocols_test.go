@@ -109,7 +109,7 @@ func mockIGD(t *testing.T) *httptest.Server {
 		case "/desc.xml":
 			fmt.Fprint(w, `<?xml version="1.0"?><root xmlns="urn:schemas-upnp-org:device-1-0"><device>
 <deviceType>urn:schemas-upnp-org:device:InternetGatewayDevice:1</deviceType><friendlyName>MOCK Router</friendlyName>
-<manufacturer>MOCK</manufacturer><modelName>R-1</modelName><deviceList><device><deviceList><device>
+<manufacturer>MOCK</manufacturer><modelName>R-1</modelName><softwareVersion>7.57</softwareVersion><deviceList><device><deviceList><device>
 <serviceList><service><serviceType>urn:schemas-upnp-org:service:WANIPConnection:1</serviceType>
 <controlURL>/ctl</controlURL></service></serviceList></device></deviceList></device></deviceList></device></root>`)
 		case "/ctl":
@@ -153,7 +153,8 @@ func TestSSDPDescribesTheDeviceAndReadsTheIGDPortMappings(t *testing.T) {
 	if ssdp.Method != MethodSSDP {
 		ssdp, igdObs = igdObs, ssdp
 	}
-	if ssdp.Details["friendlyName"] != "MOCK Router" || ssdp.Details["server"] != "MOCK/1.0 UPnP/1.0" {
+	if ssdp.Details["friendlyName"] != "MOCK Router" || ssdp.Details["server"] != "MOCK/1.0 UPnP/1.0" ||
+		ssdp.Details["softwareVersion"] != "7.57" {
 		t.Fatalf("ssdp details %v", ssdp.Details)
 	}
 	m, _ := igdObs.Details["portMappings"].([]map[string]any)

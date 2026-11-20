@@ -40,7 +40,10 @@ const (
 	routerFile  = "router.json"
 	// homeAssistantFile holds the Home Assistant URL and long-lived token (Milestone 15)
 	homeAssistantFile = "homeassistant.json"
-	pemType           = "PRIVATE KEY"
+	// directoryFile and sophosFile hold the people integrations (M24, ADR-083)
+	directoryFile = "directory.json"
+	sophosFile    = "sophos.json"
+	pemType       = "PRIVATE KEY"
 	// dpapiMagic prefixes key files encrypted with Windows DPAPI
 	dpapiMagic = "SHSC-DPAPI-1\n"
 )
@@ -203,7 +206,7 @@ func (s Store) Secure() error {
 // agent.revoked-<time>.json for diagnosis. Afterwards Exists is false and a new enrollment
 // with a new token is possible.
 func (s Store) Retire(now time.Time) error {
-	for _, name := range []string{keyFile, pendingFile, routerFile, homeAssistantFile} {
+	for _, name := range []string{keyFile, pendingFile, routerFile, homeAssistantFile, directoryFile, sophosFile} {
 		if err := os.Remove(filepath.Join(s.Dir, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("delete %s: %w", name, err)
 		}
@@ -237,6 +240,44 @@ func (s Store) LoadHomeAssistant() (config []byte, ok bool, err error) {
 
 // RemoveHomeAssistant deletes the Home Assistant settings.
 func (s Store) RemoveHomeAssistant() error { return s.removeFile(homeAssistantFile) }
+
+// SaveIntegration stores the settings of a people integration ("directory" or "sophos"),
+// protected like the private key. They never leave this machine.
+func (s Store) SaveIntegration(name string, config []byte) error {
+	file, err := integrationFile(name)
+	if err != nil {
+		return err
+	}
+	return s.saveSecret(file, config)
+}
+
+// LoadIntegration returns the settings of a people integration; ok is false when none are stored.
+func (s Store) LoadIntegration(name string) (config []byte, ok bool, err error) {
+	file, err := integrationFile(name)
+	if err != nil {
+		return nil, false, err
+	}
+	return s.loadSecret(file)
+}
+
+// RemoveIntegration deletes the settings of a people integration.
+func (s Store) RemoveIntegration(name string) error {
+	file, err := integrationFile(name)
+	if err != nil {
+		return err
+	}
+	return s.removeFile(file)
+}
+
+func integrationFile(name string) (string, error) {
+	switch name {
+	case "directory":
+		return directoryFile, nil
+	case "sophos":
+		return sophosFile, nil
+	}
+	return "", fmt.Errorf("unknown integration %q", name)
+}
 
 func (s Store) saveSecret(name string, config []byte) error {
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {

@@ -344,6 +344,102 @@ abstract class AppLocalizations {
   /// **'MAC casuale (privacy del dispositivo)'**
   String get randomizedMac;
 
+  /// No description provided for @deviceInterfaces.
+  ///
+  /// In it, this message translates to:
+  /// **'Interfacce di rete'**
+  String get deviceInterfaces;
+
+  /// No description provided for @deviceAddresses.
+  ///
+  /// In it, this message translates to:
+  /// **'Indirizzi IP e storico'**
+  String get deviceAddresses;
+
+  /// No description provided for @addressCurrent.
+  ///
+  /// In it, this message translates to:
+  /// **'attuale'**
+  String get addressCurrent;
+
+  /// No description provided for @addressPast.
+  ///
+  /// In it, this message translates to:
+  /// **'non più visto'**
+  String get addressPast;
+
+  /// No description provided for @addressScope.
+  ///
+  /// In it, this message translates to:
+  /// **'{scope, select, PRIVATE{privato} PUBLIC{pubblico} LINK_LOCAL{link-local} LOOPBACK{loopback} UNIQUE_LOCAL{locale univoco (ULA)} GLOBAL{globale} MULTICAST{multicast} other{altro}}'**
+  String addressScope(String scope);
+
+  /// No description provided for @addressInterfaceId.
+  ///
+  /// In it, this message translates to:
+  /// **'{kind, select, EUI64{derivato dal MAC (EUI-64)} RANDOM{casuale (privacy)} other{-}}'**
+  String addressInterfaceId(String kind);
+
+  /// No description provided for @identityTitle.
+  ///
+  /// In it, this message translates to:
+  /// **'Scheda dispositivo'**
+  String get identityTitle;
+
+  /// No description provided for @identityCustomName.
+  ///
+  /// In it, this message translates to:
+  /// **'Nome personalizzato'**
+  String get identityCustomName;
+
+  /// No description provided for @identityField.
+  ///
+  /// In it, this message translates to:
+  /// **'{field, select, HOSTNAME{Nome di rete} MANUFACTURER{Produttore} MODEL{Modello} PRODUCT_CODE{Codice prodotto} FIRMWARE{Firmware} OS{Sistema operativo} DEVICE_TYPE{Categoria} CPE{CPE} other{{field}}}'**
+  String identityField(String field);
+
+  /// No description provided for @identityStatus.
+  ///
+  /// In it, this message translates to:
+  /// **'{status, select, VERIFIED{Verificato} PROBABLE{Probabile} other{Sconosciuto}}'**
+  String identityStatus(String status);
+
+  /// No description provided for @identitySources.
+  ///
+  /// In it, this message translates to:
+  /// **'Fonti'**
+  String get identitySources;
+
+  /// No description provided for @identityUserConfirmed.
+  ///
+  /// In it, this message translates to:
+  /// **'confermato dall\'utente'**
+  String get identityUserConfirmed;
+
+  /// No description provided for @identityConflict.
+  ///
+  /// In it, this message translates to:
+  /// **'fonti in disaccordo'**
+  String get identityConflict;
+
+  /// No description provided for @identityStatusRule.
+  ///
+  /// In it, this message translates to:
+  /// **'Verificato: dichiarato dal dispositivo, confermato dall\'utente o da due fonti indipendenti concordanti. Le correzioni si fanno dalla dashboard web.'**
+  String get identityStatusRule;
+
+  /// No description provided for @identityHistory.
+  ///
+  /// In it, this message translates to:
+  /// **'Storico identificazione'**
+  String get identityHistory;
+
+  /// No description provided for @identityOrigin.
+  ///
+  /// In it, this message translates to:
+  /// **'{origin, select, USER{modifica utente} other{scansione}}'**
+  String identityOrigin(String origin);
+
   /// No description provided for @openPorts.
   ///
   /// In it, this message translates to:
@@ -365,7 +461,7 @@ abstract class AppLocalizations {
   /// No description provided for @category.
   ///
   /// In it, this message translates to:
-  /// **'{category, select, ROUTER{Router} IP_CAMERA{Videocamera} SMART_TV{Smart TV} SMARTPHONE{Smartphone} TABLET{Tablet} LAPTOP{Portatile} DESKTOP{Computer} PRINTER{Stampante} NAS{NAS} SMART_PLUG{Presa smart} SMART_SPEAKER{Altoparlante smart} IOT{Dispositivo IoT} other{Non identificato}}'**
+  /// **'{category, select, ROUTER{Router} IP_CAMERA{Videocamera} SMART_TV{Smart TV} SMARTPHONE{Smartphone} TABLET{Tablet} LAPTOP{Portatile} DESKTOP{Computer} PRINTER{Stampante} NAS{NAS} SMART_PLUG{Presa smart} SMART_SPEAKER{Altoparlante smart} IOT{Dispositivo IoT} VOIP_PHONE{Telefono VoIP} NETWORK_DEVICE{Apparato di rete} SERVER{Server} other{Non identificato}}'**
   String category(String category);
 
   /// No description provided for @scans.
@@ -535,6 +631,30 @@ abstract class AppLocalizations {
   /// In it, this message translates to:
   /// **'Scansioni'**
   String get viewScans;
+
+  /// No description provided for @peopleTitle.
+  ///
+  /// In it, this message translates to:
+  /// **'Persone'**
+  String get peopleTitle;
+
+  /// No description provided for @peopleNone.
+  ///
+  /// In it, this message translates to:
+  /// **'Nessuna persona associata. Le associazioni si gestiscono dalla dashboard web.'**
+  String get peopleNone;
+
+  /// No description provided for @personStatus.
+  ///
+  /// In it, this message translates to:
+  /// **'{status, select, CONFIRMED{Confermata} other{Probabile}}'**
+  String personStatus(String status);
+
+  /// No description provided for @personSource.
+  ///
+  /// In it, this message translates to:
+  /// **'{source, select, DEVICE_NAME{dal nome del dispositivo} HOME_ASSISTANT{da Home Assistant} DIRECTORY{da Active Directory} FIREWALL{dal firewall} other{inserita a mano}}'**
+  String personSource(String source);
 }
 
 class _AppLocalizationsDelegate

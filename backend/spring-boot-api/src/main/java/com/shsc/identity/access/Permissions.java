@@ -27,6 +27,9 @@ public final class Permissions {
     public static final String FINDING_TRIAGE = "finding:triage";
     public static final String REPORT_GENERATE = "report:generate";
     public static final String BILLING_MANAGE = "billing:manage";
+    public static final String PERSON_READ = "person:read";
+    public static final String PERSON_MANAGE = "person:manage";
+    public static final String SCAN_DELETE = "scan:delete";
 
     private Permissions() {
     }

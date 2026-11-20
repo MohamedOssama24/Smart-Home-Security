@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/netip"
@@ -60,9 +61,18 @@ type ssdpAnswer struct {
 // of the devices in scope.
 func ssdpExchange(ctx context.Context, conn net.PacketConn, dst net.Addr, window time.Duration,
 	inScope func(netip.Addr) bool) []Observation {
-	for range 2 {
-		_, _ = conn.WriteTo([]byte(mSearch), dst)
-	}
+	return ssdpCollect(ctx, conn, func() {
+		for range 2 {
+			_, _ = conn.WriteTo([]byte(mSearch), dst)
+		}
+	}, window, inScope)
+}
+
+// ssdpCollect runs send, collects the answers of the devices in scope for the window, then
+// fetches their descriptions.
+func ssdpCollect(ctx context.Context, conn net.PacketConn, send func(), window time.Duration,
+	inScope func(netip.Addr) bool) []Observation {
+	send()
 	answers := map[netip.Addr]*ssdpAnswer{}
 	deadline := time.Now().Add(window)
 	buf := make([]byte, 4096)
@@ -150,7 +160,8 @@ func describe(ctx context.Context, src netip.Addr, a *ssdpAnswer) []Observation 
 		}
 		d := root.Device
 		for k, v := range map[string]string{"friendlyName": d.FriendlyName, "manufacturer": d.Manufacturer,
-			"modelName": d.ModelName, "modelNumber": d.ModelNumber, "deviceType": d.DeviceType} {
+			"modelName": d.ModelName, "modelNumber": d.ModelNumber, "deviceType": d.DeviceType,
+			"firmwareVersion": d.FirmwareVersion, "softwareVersion": d.SoftwareVersion} {
 			if v = strings.TrimSpace(v); v != "" {
 				details[k] = truncate(v, 128)
 			}
@@ -159,6 +170,20 @@ func describe(ctx context.Context, src netip.Addr, a *ssdpAnswer) []Observation 
 		if root.URLBase != "" {
 			if b, err := safeURL(nil, root.URLBase, src); err == nil {
 				base = b
+			}
+		}
+		// M23: the icon the device declares about itself (root device first, then embedded ones)
+		var icons []upnpIcon
+		root.Device.walk(0, func(d *upnpDevice) {
+			if len(icons) == 0 {
+				icons = d.Icons
+			}
+		})
+		if len(icons) > 0 {
+			if icon, err := fetchIcon(ctx, client, base, icons, src); err == nil {
+				out[0].Icon = icon
+			} else if errors.Is(err, errUnsafeURL) {
+				details["iconRefused"] = true // icon URL points elsewhere: never followed
 			}
 		}
 		if igd, ok := queryIGD(ctx, client, base, &root.Device, src); ok {
@@ -229,4 +254,56 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// maxSSDPUnicast bounds the hosts asked directly in one scan; ssdpUnicastGap paces the sends.
+const (
+	maxSSDPUnicast = 256
+	ssdpUnicastGap = 2 * time.Millisecond
+)
+
+// searchSSDPUnicast (M23) asks each host already found, one by one, the same UPnP search on
+// UDP 1900. Firewalls on the agent host (e.g. Windows) often drop the answers to the multicast
+// search, while the answer to a direct request is let through. Only hosts inside the authorized
+// target are asked, at most maxSSDPUnicast, and only their own answer is accepted.
+func searchSSDPUnicast(ctx context.Context, n Network, hosts []netip.Addr, emit func(Observation)) []string {
+	targets := make([]netip.AddrPort, 0, len(hosts))
+	for _, h := range hosts {
+		if h.Is4() && n.Target.Contains(h) && len(targets) < maxSSDPUnicast {
+			targets = append(targets, netip.AddrPortFrom(h, 1900))
+		}
+	}
+	if len(targets) == 0 {
+		return nil
+	}
+	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: n.Local.AsSlice()})
+	if err != nil {
+		return []string{WarnSSDPUnavailable}
+	}
+	defer conn.Close()
+	for _, o := range ssdpUnicastExchange(ctx, conn, targets, ssdpWindow, n.Target.Contains) {
+		emit(o)
+	}
+	return nil
+}
+
+// ssdpUnicastExchange sends a unicast M-SEARCH (UPnP 1.1: HOST is the device, no MX) to each
+// target and accepts answers only from the addresses asked.
+func ssdpUnicastExchange(ctx context.Context, conn net.PacketConn, targets []netip.AddrPort, window time.Duration,
+	inScope func(netip.Addr) bool) []Observation {
+	asked := make(map[netip.Addr]bool, len(targets))
+	for _, t := range targets {
+		asked[t.Addr()] = true
+	}
+	return ssdpCollect(ctx, conn, func() {
+		for _, t := range targets {
+			if ctx.Err() != nil {
+				return
+			}
+			msg := "M-SEARCH * HTTP/1.1\r\nHOST: " + t.String() + "\r\nMAN: \"ssdp:discover\"\r\n" +
+				"ST: ssdp:all\r\nUSER-AGENT: shsc-agent/1 UPnP/1.1 discovery\r\n\r\n"
+			_, _ = conn.WriteTo([]byte(msg), net.UDPAddrFromAddrPort(t))
+			time.Sleep(ssdpUnicastGap)
+		}
+	}, window, func(a netip.Addr) bool { return asked[a] && inScope(a) })
 }

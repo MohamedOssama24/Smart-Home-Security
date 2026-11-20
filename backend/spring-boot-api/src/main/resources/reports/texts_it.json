@@ -151,6 +151,9 @@
       "SMART_PLUG": "Presa smart",
       "SMART_SPEAKER": "Altoparlante smart",
       "IOT": "Dispositivo IoT",
+      "VOIP_PHONE": "Telefono VoIP",
+      "NETWORK_DEVICE": "Apparato di rete",
+      "SERVER": "Server",
       "UNKNOWN_DEVICE": "Non identificato"
     }
   }

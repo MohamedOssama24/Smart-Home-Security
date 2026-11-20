@@ -70,8 +70,16 @@ func runAgent(args []string, _, stderr io.Writer) int {
 		defer q.Close()
 		auth := agentauth.Service{Store: store}
 		// the scan worker executes only signed jobs created by a user action in the dashboard
-		worker := scan.New(scan.Options{Auth: auth, Queue: q, Logger: logger})
-		r := runner.New(runner.Options{Auth: auth, Queue: q, Logger: logger, Background: worker.Run,
+		// M24: the Sophos syslog listener fills the firewall table used by the scans
+		firewall, listen := sophosListener(store, logger)
+		worker := scan.New(scan.Options{Auth: auth, Queue: q, Logger: logger, Firewall: firewall})
+		background := func(ctx context.Context) {
+			if listen != nil {
+				go listen(ctx)
+			}
+			worker.Run(ctx)
+		}
+		r := runner.New(runner.Options{Auth: auth, Queue: q, Logger: logger, Background: background,
 			Detect: func() capabilities.Report { return detectWithRouter(store) }})
 		work = func(ctx context.Context) error {
 			err := r.Run(ctx)

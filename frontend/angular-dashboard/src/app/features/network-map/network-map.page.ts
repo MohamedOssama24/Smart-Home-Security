@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { ApiProblem, toApiProblem } from '../../core/api/api-error';
 import { AuthService } from '../../core/auth/auth.service';
 import { Device, DevicesApi } from '../../core/devices/devices.api';
+import { DeviceImagesApi, revokeAll } from '../../core/devices/device-images.api';
 import { HomesApi, Network } from '../../core/homes/homes.api';
 import { LocalizedDatePipe } from '../../core/i18n/localized-date.pipe';
 import { RiskApi, RiskSnapshot } from '../../core/risk/risk.api';
@@ -35,6 +36,8 @@ import { MapGroup, MapNode, layoutNetworkMap } from './network-layout';
     .placeholder circle { stroke-dasharray: 4 3; }
     text { fill: var(--text); font-size: 12px; text-anchor: middle; pointer-events: none; }
     .glyph { font-size: 15px; font-weight: 700; }
+    .photo { pointer-events: none; }
+    .detail-photo { max-width: 160px; max-height: 160px; border-radius: 8px; border: 1px solid var(--border); }
     .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: .85rem; }
     .linklike { border: 0; background: none; padding: 0; color: var(--primary); text-decoration: underline; }
   `],
@@ -95,7 +98,15 @@ import { MapGroup, MapNode, layoutNetworkMap } from './network-layout';
                role="button" [attr.aria-label]="label(n)" [attr.data-testid]="'node-' + n.device.id"
                (click)="select(n)" (keydown.enter)="select(n)" (keydown.space)="select(n); $event.preventDefault()">
               <circle [attr.cx]="n.x" [attr.cy]="n.y" [attr.r]="radius(g, n)" />
-              <text [attr.x]="n.x" [attr.y]="n.y + 5" class="glyph">{{ glyph(n) }}</text>
+              @if (images().get(n.device.id); as src) {
+                <clipPath [attr.id]="'clip-' + n.device.id"><circle [attr.cx]="n.x" [attr.cy]="n.y" [attr.r]="radius(g, n) - 3" /></clipPath>
+                <image class="photo" [attr.href]="src" [attr.data-testid]="'photo-' + n.device.id"
+                       [attr.x]="n.x - radius(g, n) + 3" [attr.y]="n.y - radius(g, n) + 3"
+                       [attr.width]="(radius(g, n) - 3) * 2" [attr.height]="(radius(g, n) - 3) * 2"
+                       preserveAspectRatio="xMidYMid slice" [attr.clip-path]="'url(#clip-' + n.device.id + ')'" />
+              } @else {
+                <text [attr.x]="n.x" [attr.y]="n.y + 5" class="glyph">{{ glyph(n) }}</text>
+              }
               <text [attr.x]="n.x" [attr.y]="n.y + radius(g, n) + 16">{{ short(n) }}</text>
             </g>
           }
@@ -106,6 +117,9 @@ import { MapGroup, MapNode, layoutNetworkMap } from './network-layout';
     @if (selected(); as n) {
       <section class="card wide" data-testid="details" aria-live="polite">
         <h2>{{ name(n) }}</h2>
+        @if (images().get(n.device.id); as src) {
+          <img class="detail-photo" [src]="src" [alt]="name(n)" data-testid="detail-photo" />
+        }
         <dl class="facts">
           <dt>IP</dt><dd>{{ n.device.ip ?? '—' }}</dd>
           <dt>MAC</dt><dd>{{ n.device.mac ?? '—' }}</dd>
@@ -154,12 +168,13 @@ import { MapGroup, MapNode, layoutNetworkMap } from './network-layout';
     }
   `,
 })
-export class NetworkMapPage implements OnInit {
+export class NetworkMapPage implements OnInit, OnDestroy {
   readonly homeId = input.required<string>({ alias: 'id' });
   private readonly devicesApi = inject(DevicesApi);
   private readonly homesApi = inject(HomesApi);
   private readonly riskApi = inject(RiskApi);
   private readonly auth = inject(AuthService);
+  private readonly imagesApi = inject(DeviceImagesApi);
 
   readonly devices = signal<Device[]>([]);
   readonly networks = signal<Network[]>([]);
@@ -168,6 +183,8 @@ export class NetworkMapPage implements OnInit {
   readonly loaded = signal(false);
   readonly problem = signal<ApiProblem | null>(null);
   readonly selected = signal<MapNode | null>(null);
+  /** Image shown for each device (object URL); devices without one keep the category icon. */
+  readonly images = signal<Map<string, string>>(new Map());
 
   readonly groups = computed(() =>
     layoutNetworkMap(this.devices(), this.networks(), this.riskSnapshot()?.breakdown.devices ?? (this.riskSnapshot() ? [] : null)),
@@ -187,6 +204,7 @@ export class NetworkMapPage implements OnInit {
       ]);
       this.devices.set(devices);
       this.networks.set(networks);
+      void this.loadImages();
       if (this.auth.hasPermission('finding:read')) {
         const risk = await firstValueFrom(this.riskApi.current(this.homeId()));
         this.riskSnapshot.set(risk.lastScored);
@@ -195,6 +213,19 @@ export class NetworkMapPage implements OnInit {
       this.problem.set(toApiProblem(e));
     } finally {
       this.loaded.set(true);
+    }
+  }
+
+  ngOnDestroy(): void {
+    revokeAll(this.images().values());
+  }
+
+  /** Images are an extra: if they cannot be loaded the map keeps the category icons. */
+  private async loadImages(): Promise<void> {
+    try {
+      this.images.set(await this.imagesApi.loadShown(this.homeId()));
+    } catch {
+      // no image: category icons
     }
   }
 
@@ -245,5 +276,6 @@ export class NetworkMapPage implements OnInit {
 
 const GLYPHS: Record<string, string> = {
   ROUTER: 'R', IP_CAMERA: 'C', SMART_TV: 'TV', SMARTPHONE: 'P', TABLET: 'T', LAPTOP: 'L', DESKTOP: 'D',
-  PRINTER: 'S', NAS: 'N', SMART_PLUG: 'PL', SMART_SPEAKER: 'SP', IOT: 'I', UNKNOWN_DEVICE: '?',
+  PRINTER: 'S', NAS: 'N', SMART_PLUG: 'PL', SMART_SPEAKER: 'SP', IOT: 'I', VOIP_PHONE: 'V', NETWORK_DEVICE: 'SW',
+  SERVER: 'SV', UNKNOWN_DEVICE: '?',
 };

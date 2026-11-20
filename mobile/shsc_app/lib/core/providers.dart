@@ -137,6 +137,9 @@ final devicesProvider =
 final deviceProvider =
     FutureProvider.autoDispose.family<Device, String>((ref, id) => ref.watch(apiProvider).device(id));
 
+final devicePeopleProvider = FutureProvider.autoDispose
+    .family<List<DevicePerson>, String>((ref, homeId) => ref.watch(apiProvider).devicePeople(homeId));
+
 final scansProvider =
     FutureProvider.autoDispose.family<List<Scan>, String>((ref, homeId) => ref.watch(apiProvider).scans(homeId));
 

@@ -52,7 +52,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('open-devices')));
     await tester.pumpAndSettle();
-    expect(find.text('mock-router'), findsOneWidget);
+    expect(find.text('Router MOCK soggiorno'), findsOneWidget); // M20: custom name first
     expect(restarted.refreshToken, 'MOCK-refresh-3');
   });
 

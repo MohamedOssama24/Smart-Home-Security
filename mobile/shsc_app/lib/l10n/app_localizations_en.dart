@@ -193,6 +193,100 @@ class AppLocalizationsEn extends AppLocalizations {
   String get randomizedMac => 'Random MAC (device privacy)';
 
   @override
+  String get deviceInterfaces => 'Network interfaces';
+
+  @override
+  String get deviceAddresses => 'IP addresses and history';
+
+  @override
+  String get addressCurrent => 'current';
+
+  @override
+  String get addressPast => 'no longer seen';
+
+  @override
+  String addressScope(String scope) {
+    String _temp0 = intl.Intl.selectLogic(scope, {
+      'PRIVATE': 'private',
+      'PUBLIC': 'public',
+      'LINK_LOCAL': 'link-local',
+      'LOOPBACK': 'loopback',
+      'UNIQUE_LOCAL': 'unique local (ULA)',
+      'GLOBAL': 'global',
+      'MULTICAST': 'multicast',
+      'other': 'other',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String addressInterfaceId(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'EUI64': 'derived from the MAC (EUI-64)',
+      'RANDOM': 'random (privacy)',
+      'other': '-',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get identityTitle => 'Device card';
+
+  @override
+  String get identityCustomName => 'Custom name';
+
+  @override
+  String identityField(String field) {
+    String _temp0 = intl.Intl.selectLogic(field, {
+      'HOSTNAME': 'Network name',
+      'MANUFACTURER': 'Manufacturer',
+      'MODEL': 'Model',
+      'PRODUCT_CODE': 'Product code',
+      'FIRMWARE': 'Firmware',
+      'OS': 'Operating system',
+      'DEVICE_TYPE': 'Category',
+      'CPE': 'CPE',
+      'other': '$field',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String identityStatus(String status) {
+    String _temp0 = intl.Intl.selectLogic(status, {
+      'VERIFIED': 'Verified',
+      'PROBABLE': 'Probable',
+      'other': 'Unknown',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get identitySources => 'Sources';
+
+  @override
+  String get identityUserConfirmed => 'confirmed by the user';
+
+  @override
+  String get identityConflict => 'sources disagree';
+
+  @override
+  String get identityStatusRule =>
+      'Verified: declared by the device, confirmed by the user or by two independent agreeing sources. Corrections are made from the web dashboard.';
+
+  @override
+  String get identityHistory => 'Identification history';
+
+  @override
+  String identityOrigin(String origin) {
+    String _temp0 = intl.Intl.selectLogic(origin, {
+      'USER': 'user change',
+      'other': 'scan',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get openPorts => 'Services exposed on the network';
 
   @override
@@ -224,6 +318,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'SMART_PLUG': 'Smart plug',
       'SMART_SPEAKER': 'Smart speaker',
       'IOT': 'IoT device',
+      'VOIP_PHONE': 'VoIP phone',
+      'NETWORK_DEVICE': 'Network device',
+      'SERVER': 'Server',
       'other': 'Unidentified',
     });
     return '$_temp0';
@@ -391,4 +488,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get viewScans => 'Scans';
+
+  @override
+  String get peopleTitle => 'People';
+
+  @override
+  String get peopleNone =>
+      'No person associated. Associations are managed from the web dashboard.';
+
+  @override
+  String personStatus(String status) {
+    String _temp0 = intl.Intl.selectLogic(status, {
+      'CONFIRMED': 'Confirmed',
+      'other': 'Probable',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String personSource(String source) {
+    String _temp0 = intl.Intl.selectLogic(source, {
+      'DEVICE_NAME': 'from the device name',
+      'HOME_ASSISTANT': 'from Home Assistant',
+      'DIRECTORY': 'from Active Directory',
+      'FIREWALL': 'from the firewall',
+      'other': 'entered manually',
+    });
+    return '$_temp0';
+  }
 }

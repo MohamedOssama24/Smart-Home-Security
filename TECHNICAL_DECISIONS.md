@@ -523,3 +523,222 @@ Con il disegno da codice, il test snapshot verifica testo e layout senza un moto
 **Conseguenze**: Windows SmartScreen e macOS Gatekeeper continueranno ad avvisare sui binari non firmati con certificato di piattaforma. La verifica è manuale finché non esiste un aggiornamento automatico dell'agent.
 
 **Rivedere quando**: c'è un budget per certificati di firma del codice o si introduce l'aggiornamento automatico dell'agent (che dovrà verificare la firma prima di installare).
+
+### ADR-074 — Inventario per interfacce e storico degli indirizzi
+**Stato**: Proposta (M19)
+
+**Decisione**:
+- **Interfacce**: nuova tabella `device_interfaces` (V018), un MAC per riga, unico nell'abitazione. L'identità di un dispositivo diventa "una delle sue interfacce"; `devices.mac` resta il primo MAC visto (compatibilità M8–M18). Una scansione unisce prima i gruppi di osservazioni i cui MAC appartengono allo stesso dispositivo, che viene aggiornato una sola volta con tutti gli indirizzi.
+- **Storico indirizzi**: `device_addresses` registra ogni IPv4/IPv6 visto, con prima/ultima rilevazione, MAC e numero di scansioni. Ambito (privato, link-local, ULA, globale…) e tipo di identificativo IPv6 (EUI-64 o casuale) sono calcolati dal backend (`Addresses`), non memorizzati. "Attuale" = visto dall'ultima scansione del dispositivo.
+- **Conservazione**: IPv6 globali con identificativo casuale (temporanei/privacy) eliminati se non visti da 30 giorni; al massimo 256 indirizzi per dispositivo (si eliminano i meno recenti).
+- **EUI-64**: un indirizzo IPv6 visto senza MAC si unisce al dispositivo il cui MAC è contenuto nell'identificativo EUI-64, solo se quel MAC è visto nella stessa scansione o è già un'interfaccia nota dell'abitazione.
+- **Unione mai automatica**: due dispositivi con lo stesso nome restano "probabilmente lo stesso dispositivo" (`probable_same_as`, ora per qualsiasi MAC, verso il dispositivo visto per primo). L'utente con `device:classify` conferma (`POST /devices/{id}/merge`: interfacce, indirizzi, osservazioni, porte, alert e finding non duplicati passano al dispositivo di destinazione, l'altro viene eliminato) oppure esclude la coppia (`same_as_dismissed`). Entrambe le azioni vanno nell'audit.
+- **Ambito invariato**: si registrano solo indirizzi delle reti autorizzate; il filtro di ambito delle osservazioni non cambia.
+
+**Motivazione**: un dispositivo dual-stack o con due schede (Ethernet + Wi-Fi) compariva come più dispositivi e gli indirizzi precedenti andavano persi. Un nome uguale non basta a dimostrare che due MAC siano lo stesso dispositivo, quindi la conferma resta all'utente.
+
+**Alternative**: unione automatica per nome (rischio di unire dispositivi diversi); colonne aggiuntive su `devices` (nessuno storico); memorizzare ambito e tipo nel database (derivabili dall'indirizzo).
+
+**Conseguenze**:
+- L'unione non è reversibile: identificazioni, storico delle categorie, protocolli e finding duplicati del dispositivo rimosso si ricalcolano alla scansione successiva. La categoria manuale del dispositivo rimosso non viene copiata.
+- Gli IPv6 globali (2000::/3) non vengono registrati, perché solo reti private, ULA e link-local sono autorizzabili (`NetworkRange`).
+
+**Rivedere quando**: si decide di accettare gli IPv6 globali dei dispositivi già in ambito (raccolti in modo passivo, senza scansione), oppure serve "separare" un'unione.
+
+### ADR-075 — IPv6 globali registrati in modo passivo
+**Stato**: Proposta (M19, supera la conseguenza di ADR-074 sugli IPv6 globali)
+
+**Decisione**: l'agent legge dalla propria tabella dei vicini gli indirizzi IPv6 globali (2000::/3) **non** in ambito e li allega, nel dettaglio `globalIpv6`, all'osservazione in ambito con lo stesso MAC (massimo 8 per MAC, 256 per scansione). Non diventano host, non vengono mai sondati, scansionati o contattati. Il backend li aggiunge allo storico indirizzi del dispositivo (massimo 8 per osservazione), con le regole di conservazione di ADR-074 (casuali eliminati dopo 30 giorni).
+
+**Motivazione**: un dispositivo dual-stack usa spesso solo indirizzi globali; ignorarli rende incompleto l'inventario. La lettura della tabella dei vicini è passiva e non estende l'ambito autorizzato.
+
+**Alternative**: autorizzare i prefissi globali come reti (estenderebbe l'ambito delle scansioni); ignorarli (inventario incompleto).
+
+**Conseguenze**: un indirizzo globale compare solo se appartiene a un MAC già in ambito; `NetworkRange` continua a rifiutare i prefissi globali.
+
+**Rivedere quando**: si vuole analizzare attivamente i servizi esposti su IPv6 globale (servirebbe un consenso esplicito e un limite di ambito diverso).
+
+### ADR-076 — Stato dei campi di identità e origine delle fonti
+**Stato**: Proposta (M20)
+
+**Decisione**:
+- Ogni candidato di un campo registra **fonte** (metodo), **affidabilità** (H/M/L), **origine** (l'informazione originaria) e se è **dichiarato dal dispositivo**. Lo stato del campo (`device_identifications.status`, V019) è:
+  - **VERIFIED**: nessun conflitto e (una fonte dichiarata concorda, oppure ≥ 2 **origini distinte** con affidabilità H/M concordano), oppure valore confermato dall'utente;
+  - **PROBABLE**: tutti gli altri casi, compreso ogni conflitto;
+  - **UNKNOWN**: nessun valore (calcolato nella risposta, non memorizzato).
+- Dichiarati: descrittore UPnP (produttore, modello, codice prodotto, firmware), TXT mDNS, IPP, autodescrizione del router (TR-064/SNMP), nomi annunciati via mDNS/NetBIOS, IP e MAC osservati direttamente (ARP/NDP/agent).
+- Stessa origine: i nomi delle tabelle del router (TR-064, SNMP) e il DNS inverso derivano dallo stesso annuncio DHCP (`NAME_ANNOUNCEMENT`); i dati dall'OUI hanno origine `OUI` e affidabilità L. Le euristiche (L) non contano mai come conferma.
+- Home Assistant: origine indipendente (`HOME_ASSISTANT`, M) ma non dichiarazione: da solo dà PROBABLE.
+- **CPE** derivato da produttore e modello (`cpe:2.3:h:…`, componenti normalizzati ed escapati): sempre PROBABLE salvo conferma dell'utente. **Categoria**: PROBABLE, VERIFIED solo se impostata manualmente.
+- **Conferme dell'utente** (`device_identity_confirmations`, `PUT /devices/{id}/identity`): prevalgono sulle scansioni, che non le sovrascrivono; il conflitto con le fonti resta visibile. **Nome personalizzato** (`devices.custom_name`, `PUT /devices/{id}/name`): mai modificato dalle scansioni.
+- **Storico** (`device_identification_history`): ogni cambio di valore o di stato, con origine SCAN/USER, massimo 50 voci per campo.
+
+**Motivazione**: il criterio M20 richiede 0 valori "Verificato" errati: due fonti che ripetono la stessa informazione non sono una conferma.
+
+**Alternative**: stato derivato dalla sola confidenza (non distingue origini ripetute); CPE dal dizionario NVD (mapping IoT ambiguo, nessuna dipendenza nuova ora).
+
+**Conseguenze**: molti campi restano PROBABLE o UNKNOWN (firmware spesso non esposto). Rimuovere una conferma riporta il valore delle fonti come PROBABLE fino alla scansione successiva.
+
+**Rivedere quando**: si introduce il dizionario CPE NVD (M21) o SNMP con community inserita dall'utente.
+
+### ADR-077 — Immagini dei dispositivi (M23)
+
+**Decisione**:
+- **Icona dichiarata dal dispositivo**: l'agent la scarica dalla descrizione UPnP del dispositivo (origine `UPNP`, fonte `DEVICE`), tabella `scan_device_icons`, poi adottata in `device_images`.
+- **Ricerca SSDP unicast**: gli host trovati che non hanno risposto alla ricerca multicast vengono interrogati direttamente (`HOST: ip:1900`, massimo 256, solo IPv4 del target autorizzato, accettate solo le risposte degli indirizzi interrogati).
+- **Foto dell'utente** (fonte `USER`, origine `UPLOAD`): mostrata prima dell'icona e mai sostituita da una scansione.
+- **Sicurezza**:
+  - accettati solo PNG e JPEG reali (verifica del contenuto, massimo 1 MB);
+  - servite con `nosniff`, `Content-Security-Policy: default-src 'none'; sandbox`, ETag e cache privata;
+  - le icone di indirizzi fuori dalle reti autorizzate vengono scartate.
+
+**Motivazione**: riconoscere a colpo d'occhio i dispositivi senza servizi esterni.
+
+**Conseguenze**:
+- Le reti senza UPnP non producono icone (verificato sulla rete d'ufficio: 0 risposte): lì serve la foto caricata.
+- Il frontend scarica le immagini con la sessione (blob → object URL), perché un `<img src>` non si autentica. Per questo la CSP della dashboard ammette `img-src … blob:` (solo immagini: gli script restano `'self'`). Senza, il browser blocca ogni immagine, cosa che i test unitari non rilevano.
+- Verificato sulla rete reale: la TV LG ha risposto alla ricerca SSDP unicast e la sua icona (PNG 120×120) è comparsa in elenco e mappa.
+
+### ADR-078 — Identificazione: registro OUI, regole TV/PC, mDNS unicast
+
+**Decisione**:
+- **Registro OUI IEEE**: senza il registro nessun produttore viene ricavato dal MAC.
+  - La sincronizzazione resta manuale e riservata all'amministratore di piattaforma (`POST /api/v1/platform/oui/sync`).
+  - Dietro un proxy TLS aziendale il download del backend fallisce, perché Java non si fida della CA del proxy. In quel caso si scaricano i 3 CSV pubblici con il trust store di sistema e si importano in `oui_entries`, con gli stessi vincoli del parser.
+  - Non si installano certificati e non si disattiva la verifica TLS.
+- **Ruleset `2026.11-3`**:
+  - `tv.mdns-tv-os` (STRONG): piattaforma TV nel nome mDNS dichiarato, per esempio "webOS TV";
+  - `tv.hostname-os` (MODERATE);
+  - `desktop.netbios-pc-maker` (STRONG): nome NetBIOS più OUI di un produttore di PC, due indizi indipendenti. Esclusi i server (HPE) e le macchine virtuali (Microsoft).
+- **mDNS unicast** (RFC 6762 §5.5): agli host trovati che non hanno risposto in multicast si chiede direttamente sulla porta 5353 il nome che si danno (PTR inverso in `.local`) e i servizi DNS-SD.
+  - Vincoli: massimo 256 host, solo IPv4 del target, solo le risposte degli indirizzi interrogati.
+  - Gli indirizzi aggiuntivi dichiarati non vengono attribuiti.
+
+**Motivazione**: nella rete reale produttore, categoria e nome mancavano per quasi tutti i dispositivi. Con il registro, il produttore si ricava per tutti i MAC non casuali (36/36).
+
+**Alternative**:
+- assegnare il ruolo di amministratore di piattaforma all'utente via database (scartata: escalation di privilegi);
+- fidarsi del proxy disattivando la verifica TLS (scartata).
+
+**Conseguenze**:
+- Telefoni VoIP, firewall e switch non hanno una categoria dedicata e restano "non identificati".
+- I dispositivi che non dichiarano un nome restano senza nome: per quelli c'è il nome personalizzato.
+
+**Rivedere quando**: si aggiungono categorie (VoIP, apparato di rete, server: fatto con ADR-079) o la sincronizzazione OUI pianificata.
+
+### ADR-079 — Categorie Telefono VoIP, Apparato di rete, Server
+
+**Decisione**:
+- Nuove categorie: `VOIP_PHONE`, `NETWORK_DEVICE` (firewall, switch, access point) e `SERVER`. La migrazione V021 aggiorna i vincoli della categoria automatica e di quella manuale.
+- Etichette e icone aggiunte in dashboard, app mobile e report.
+- **Ruleset `2026.11-4`** (73 regole):
+  - **Produttori monouso** (STRONG): produttori le cui schede di rete finiscono solo in un tipo di apparato.
+    - VoIP: Yealink, Grandstream, Snom, Fanvil, Polycom, Htek.
+    - Rete: Sophos, Fortinet, Palo Alto, WatchGuard, SonicWall, Netgate, Juniper, Aruba, Ruckus, Cambium.
+    - È un'eccezione dichiarata a "l'OUI è solo un indizio debole": essendo una sola fonte, la confidenza resta al massimo MEDIA e la categoria PROBABILE.
+    - I produttori generici, come TP-Link, restano indizi deboli.
+  - **Server**:
+    - nome NetBIOS da server (`server`, `srv`, `dc`, `hyperv`…) su una scheda di un produttore di server o di una macchina virtuale (STRONG);
+    - hostname da server (MODERATE);
+    - NetBIOS su scheda virtuale Microsoft o VMware (MODERATE).
+    - Un nome da server prevale sulla regola "computer" (stessa scheda Dell, punteggio più alto).
+  - **VoIP e rete da servizi e nomi**: servizio SIP, porte 5060/5061, hostname, titolo dell'interfaccia web.
+
+**Motivazione**: nella rete reale la maggior parte dei dispositivi "non identificati" erano telefoni VoIP, firewall e server, per i quali non esisteva una categoria.
+
+**Conseguenze**:
+- Le scansioni successive ricalcolano la categoria.
+- Le categorie manuali non vengono mai sovrascritte.
+- Le app più vecchie mostrano queste categorie come "non identificato", grazie al fallback.
+
+### ADR-080 — Doppioni senza MAC, ricalcolo dei dispositivi non visti, nuove regole
+
+**Contesto**: nella rete reale c'erano due problemi.
+- Alcuni IP comparivano due volte. In una scansione l'host aveva risposto solo al ping, senza MAC: diventava un dispositivo "per indirizzo", separato da quello con il MAC.
+- I dispositivi non visti nelle ultime scansioni conservavano valori calcolati prima dell'import del registro OUI e delle nuove regole.
+
+**Decisione**:
+- **Doppioni**:
+  - Un host visto senza MAC all'indirizzo attuale di un dispositivo noto con MAC è quel dispositivo. Eccezione: se quel MAC compare a un altro indirizzo nella stessa scansione, l'indirizzo è passato a un altro host.
+  - Alla fine di ogni scansione, i dispositivi "solo indirizzo" con un gemello con MAC allo stesso indirizzo vengono uniti a quel gemello.
+  - Restano separati quelli con dati inseriti dall'utente (categoria manuale, nome, valori confermati): per loro l'unione resta manuale (M19).
+- **Ricalcolo**:
+  - Alla fine di ogni scansione si ricalcolano i dispositivi non visti con un risultato superato: ruleset diverso, oppure MAC di produttore ancora senza produttore.
+  - Si usano le osservazioni della loro ultima scansione, senza traffico, con al massimo 100 dispositivi per scansione.
+  - Data e scansione dell'ultimo avvistamento non cambiano.
+- **Dashboard**: i dispositivi assenti dall'ultima scansione sono marcati "non visto nell'ultima scansione".
+- **Agent**: l'osservazione `SELF` porta il nome del PC dell'agent (solo la prima etichetta, caratteri validi, al massimo 63).
+- **Ruleset `2026.11-5`**:
+  - `desktop.netbios-workstation` (STRONG): un nome dichiarato via NetBIOS, esclusi i nomi da server, NAS e stampante. È una sola fonte, quindi al massimo MEDIA. NetBIOS non distingue un fisso da un portatile: la correzione è manuale.
+  - `server.vm-netbios` passa a STRONG e si aggiunge `server.netbios-server-maker` (HPE, Supermicro): con un nome da postazione su queste schede c'è parità, quindi il dispositivo resta non identificato invece di essere preso per un PC.
+  - `phone.android-private-mac` (STRONG): nome Android predefinito più MAC privato. Nuovo segnale `mac.randomized`.
+  - `iot.oui-tuya` (STRONG): le schede Tuya sono solo in dispositivi smart. Una sola fonte, quindi MEDIA.
+
+**Motivazione**: dati sbagliati (doppioni, valori vecchi) sono peggio di dati mancanti. Le nuove regole coprono i casi più frequenti della rete reale senza abbassare la soglia.
+
+**Conseguenze**:
+- Un ping senza ARP a un indirizzo riassegnato a un host nuovo (DHCP) viene attribuito al vecchio dispositivo finché ARP non risponde. È un caso raro: sulla stessa rete il ping passa comunque per ARP.
+- I dispositivi "solo indirizzo" uniti perdono la loro cronologia di categoria; il dispositivo con il MAC tiene la sua.
+
+### ADR-081 — Dispositivo ↔ persona (M24), parte 1: persone e nomi dei dispositivi
+**Contesto**: il titolare vuole sapere in automatico chi usa ogni dispositivo. Dalla rete nessun protocollo trasmette il proprietario. L'unica informazione già raccolta che lo contiene è il nome che alcuni dispositivi annunciano ("iPhone-di-Marco", "Marcos-iPhone"). Fonti precise sono i sistemi in cui le persone fanno l'accesso (Active Directory, firewall con identificazione utenti): parte 2 e 3, da decidere a parte.
+
+**Decisione (parte 1)**:
+- Tabelle `home_people` (solo etichetta, origine, account facoltativo, `dismissed`) e `device_person_assignments` (`PROBABLE` / `CONFIRMED` / `REJECTED`, fonte, evidenza), migrazione V022 con RLS. Permessi nuovi `person:read` e `person:manage` (tutti i ruoli tranne `READ_ONLY`).
+- **Automatico, a fine scansione** (stessa transazione, nessun traffico): si cerca un nome di persona nei nomi già raccolti del dispositivo (nome attuale, tutte le fonti del campo `HOSTNAME`, nome dato dall'utente) e nel nome del dispositivo in Home Assistant. Solo due forme: "dispositivo di/of Nome" e "Nome[s]-dispositivo", con una parola di dispositivo vicina e un elenco di parole generiche escluse ("Android", "DESKTOP", "admin"...). La persona viene creata se manca; l'associazione è `PROBABLE` con il nome come evidenza.
+- **Decisioni dell'utente** (web): conferma (`CONFIRMED`), rimozione (`REJECTED`: non viene più riproposta), associazione manuale, nuova persona, rinomina, eliminazione. Una persona creata automaticamente ed eliminata resta solo come nome nascosto, così le scansioni non la ricreano; le sue associazioni sono cancellate.
+- Unione di dispositivi (M19): le associazioni passano al dispositivo che resta.
+- Audit di ogni azione dell'utente (`PERSON_*`, `DEVICE_PERSON_*`) senza il nome della persona. App: sola lettura.
+
+**Motivazione**: solo dati già raccolti, nessuna inferenza da traffico, posizione o orari; un'associazione automatica non è mai presentata come certa.
+
+**Conseguenze**:
+- Nelle reti con nomi predefiniti (DESKTOP-xxx, Android_xxx) la parte 1 trova poche persone.
+- Un nome di dispositivo può essere sbagliato o di un'altra persona (dispositivo prestato): per questo resta `PROBABLE` finché l'utente non conferma.
+- Sul lavoro l'associazione dispositivo-dipendente richiede informativa GDPR e, per il controllo a distanza, le regole dell'art. 4 dello Statuto dei lavoratori: l'interfaccia lo ricorda, la decisione è del titolare.
+
+### ADR-082 — Cancellazione delle scansioni e dell'inventario
+**Contesto**: il titolare vuole cancellare le scansioni fatte. Non esisteva alcun modo: i dispositivi, i problemi, i report e lo storico del rischio puntano alle scansioni.
+
+**Decisione**:
+- Nuovo permesso `scan:delete` (V023): `SUPER_ADMIN`, `ORGANIZATION_ADMIN`, `CUSTOMER`. Non ai tecnici né ai `READ_ONLY`.
+- `DELETE /scans/{id}`, solo per scansioni concluse (`409 SCAN_ACTIVE` altrimenti):
+  - dispositivi e problemi visti solo da quella scansione vengono cancellati;
+  - gli altri puntano alla scansione precedente o successiva in cui sono stati visti; i dispositivi la cui ultima scansione è stata cancellata vengono ricalcolati dalle osservazioni della nuova ultima scansione (stesso meccanismo di ADR-080, senza traffico);
+  - report e punto di rischio di quella scansione vengono cancellati.
+- `DELETE /homes/{homeId}/inventory` (`409 SCAN_ACTIVE` con una scansione in corso): cancella scansioni, dispositivi, problemi, persone (M24), report, storico del rischio e avvisi dell'abitazione. Restano abitazione, reti, autorizzazioni e agent.
+- Entrambe in una transazione, irreversibili (nessuna copia di riserva), con audit `SCAN_DELETED` / `HOME_INVENTORY_CLEARED` e i soli conteggi.
+- Dashboard: pulsanti nella cronologia delle scansioni con doppia conferma e avviso "definitivo".
+
+**Conseguenze**:
+- I dati inseriti dall'utente su un dispositivo visto solo dalla scansione cancellata (nome, foto, persone) vengono persi: l'avviso lo dice.
+- L'app non offre la cancellazione (solo web).
+
+## ADR-083 — Persone dagli accessi Active Directory e dal syslog Sophos (M24, parti 2–3)
+
+**Contesto**: in ufficio i nomi dei dispositivi (DESKTOP-xxx, Android_xxx) non identificano chi li usa. L'utente ha scelto come fonti gli accessi al dominio Active Directory e le autenticazioni del firewall Sophos. Restano esclusi traffico attivo verso host non autorizzati, nuove dipendenze e servizi a pagamento.
+
+**Decisione**:
+- **Active Directory**:
+  - l'agent Windows legge il registro Security del controller di dominio con l'API Event Log di sistema (`wevtapi.dll` via `golang.org/x/sys/windows`, già presente: nessuna nuova dipendenza);
+  - sessione RPC in sola lettura, eventi 4624 e 4768 riusciti delle ultime 12 ore (configurabile fino a 72);
+  - account dell'IT membro solo di "Event Log Readers", password su stdin, salvata con DPAPI;
+  - letto solo a ogni scansione avviata dalla dashboard e solo se il controller di dominio è in una rete autorizzata.
+  - Scartato LDAP `managedBy`: nuova dipendenza e dato spesso vuoto.
+- **Sophos**:
+  - listener syslog UDP passivo sull'agent (porta 5514 configurabile), che accetta solo pacchetti dall'IP del firewall configurato;
+  - conserva in memoria solo IP ↔ utente (`user_name`/`user`, `src_ip`/`srcip`) per 12 ore, al massimo 4096 voci;
+  - non interroga l'API del firewall: nessuna credenziale sul firewall.
+- **Trasporto**:
+  - nuova sezione `identities` del batch dei risultati, in un batch separato;
+  - il backend tiene solo gli indirizzi delle reti autorizzate e li salva in `scan_identities` (V024, RLS), che si cancella con la scansione.
+- **Associazione**:
+  - a fine scansione, l'account sull'indirizzo di un dispositivo di quella scansione diventa una persona (`origin` DIRECTORY/FIREWALL, `external_key` = account in minuscolo) con associazione PROBABILE;
+  - le decisioni dell'utente e le persone eliminate vengono rispettate, come in ADR-081.
+
+**Conseguenze**:
+- Uso lecito solo con informativa GDPR e nel rispetto dell'art. 4 dello Statuto dei lavoratori: la responsabilità è del titolare, la documentazione lo ricorda.
+- IP condivisi o riassegnati possono dare associazioni sbagliate, per questo restano solo PROBABILI.
+- Il syslog UDP non è autenticato.
+- Le modifiche alla configurazione Sophos richiedono il riavvio dell'agent; la tabella è in memoria e si svuota al riavvio.
+- Verificato solo con dati MOCK: nessun contatto con il dominio o il firewall reali (rete 192.168.1.0/24 non autorizzata per i test).

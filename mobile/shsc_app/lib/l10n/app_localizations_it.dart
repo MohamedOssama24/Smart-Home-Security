@@ -193,6 +193,100 @@ class AppLocalizationsIt extends AppLocalizations {
   String get randomizedMac => 'MAC casuale (privacy del dispositivo)';
 
   @override
+  String get deviceInterfaces => 'Interfacce di rete';
+
+  @override
+  String get deviceAddresses => 'Indirizzi IP e storico';
+
+  @override
+  String get addressCurrent => 'attuale';
+
+  @override
+  String get addressPast => 'non più visto';
+
+  @override
+  String addressScope(String scope) {
+    String _temp0 = intl.Intl.selectLogic(scope, {
+      'PRIVATE': 'privato',
+      'PUBLIC': 'pubblico',
+      'LINK_LOCAL': 'link-local',
+      'LOOPBACK': 'loopback',
+      'UNIQUE_LOCAL': 'locale univoco (ULA)',
+      'GLOBAL': 'globale',
+      'MULTICAST': 'multicast',
+      'other': 'altro',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String addressInterfaceId(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'EUI64': 'derivato dal MAC (EUI-64)',
+      'RANDOM': 'casuale (privacy)',
+      'other': '-',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get identityTitle => 'Scheda dispositivo';
+
+  @override
+  String get identityCustomName => 'Nome personalizzato';
+
+  @override
+  String identityField(String field) {
+    String _temp0 = intl.Intl.selectLogic(field, {
+      'HOSTNAME': 'Nome di rete',
+      'MANUFACTURER': 'Produttore',
+      'MODEL': 'Modello',
+      'PRODUCT_CODE': 'Codice prodotto',
+      'FIRMWARE': 'Firmware',
+      'OS': 'Sistema operativo',
+      'DEVICE_TYPE': 'Categoria',
+      'CPE': 'CPE',
+      'other': '$field',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String identityStatus(String status) {
+    String _temp0 = intl.Intl.selectLogic(status, {
+      'VERIFIED': 'Verificato',
+      'PROBABLE': 'Probabile',
+      'other': 'Sconosciuto',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get identitySources => 'Fonti';
+
+  @override
+  String get identityUserConfirmed => 'confermato dall\'utente';
+
+  @override
+  String get identityConflict => 'fonti in disaccordo';
+
+  @override
+  String get identityStatusRule =>
+      'Verificato: dichiarato dal dispositivo, confermato dall\'utente o da due fonti indipendenti concordanti. Le correzioni si fanno dalla dashboard web.';
+
+  @override
+  String get identityHistory => 'Storico identificazione';
+
+  @override
+  String identityOrigin(String origin) {
+    String _temp0 = intl.Intl.selectLogic(origin, {
+      'USER': 'modifica utente',
+      'other': 'scansione',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get openPorts => 'Servizi esposti in rete';
 
   @override
@@ -225,6 +319,9 @@ class AppLocalizationsIt extends AppLocalizations {
       'SMART_PLUG': 'Presa smart',
       'SMART_SPEAKER': 'Altoparlante smart',
       'IOT': 'Dispositivo IoT',
+      'VOIP_PHONE': 'Telefono VoIP',
+      'NETWORK_DEVICE': 'Apparato di rete',
+      'SERVER': 'Server',
       'other': 'Non identificato',
     });
     return '$_temp0';
@@ -390,4 +487,32 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get viewScans => 'Scansioni';
+
+  @override
+  String get peopleTitle => 'Persone';
+
+  @override
+  String get peopleNone =>
+      'Nessuna persona associata. Le associazioni si gestiscono dalla dashboard web.';
+
+  @override
+  String personStatus(String status) {
+    String _temp0 = intl.Intl.selectLogic(status, {
+      'CONFIRMED': 'Confermata',
+      'other': 'Probabile',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String personSource(String source) {
+    String _temp0 = intl.Intl.selectLogic(source, {
+      'DEVICE_NAME': 'dal nome del dispositivo',
+      'HOME_ASSISTANT': 'da Home Assistant',
+      'DIRECTORY': 'da Active Directory',
+      'FIREWALL': 'dal firewall',
+      'other': 'inserita a mano',
+    });
+    return '$_temp0';
+  }
 }

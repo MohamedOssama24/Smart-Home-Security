@@ -45,6 +45,8 @@ Convenzioni: JSON, errori **RFC 9457 Problem Details** (`type`, `title`, `status
 | GET | `/agents/{id}/events` | eventi |
 
 ## Scans
+> **Implementato (ADR-082)**: `DELETE /scans/{id}` (solo scansioni concluse; cancella anche dispositivi e problemi visti solo da essa, ricalcola gli altri; `409 SCAN_ACTIVE`) · `DELETE /homes/{homeId}/inventory` (tutte le scansioni, dispositivi, problemi, persone, report, rischio e avvisi dell'abitazione; `409 SCAN_ACTIVE`). Risposta `{scans, devices, findings}`; permesso `scan:delete`; audit `SCAN_DELETED`, `HOME_INVENTORY_CLEARED`. Irreversibili.
+
 | Metodo | Path | Descrizione |
 |---|---|---|
 | POST | `/homes/{homeId}/scans` | **crea scansione manuale** `{profile, target: {type: ALL_AUTHORIZED} \| {type: DEVICES, deviceIds[]}}` → `202` |
@@ -55,6 +57,13 @@ Convenzioni: JSON, errori **RFC 9457 Problem Details** (`type`, `title`, `status
 
 ## Devices · Discovery · Fingerprinting · Ports · Services
 > **Implementato (M8)**: `GET /homes/{homeId}/devices` · `GET /devices/{id}` (con `identifications` e `categoryHistory`) · `PUT /devices/{id}/category` `{category}` (`null` = torna all'automatica; `400 INVALID_CATEGORY`) · `GET /platform/oui` · `POST /platform/oui/sync` (solo `platform:admin`). Vedi [17-DEVICE-FINGERPRINTING.md](17-DEVICE-FINGERPRINTING.md) §8. Il resto della sezione è pianificato.
+
+> **Implementato (M19)**: `GET /devices/{id}` con `interfaces` (`mac`, `macRandomized`, `vendor`, `agentInterface`, `current`, `firstSeenAt`, `lastSeenAt`) e `addressHistory` (`address`, `family`, `scope`, `interfaceId` `EUI64`/`RANDOM`, `eui64Mac`, `mac`, `current`, `firstSeenAt`, `lastSeenAt`, `timesSeen`) · `POST /devices/{id}/merge` `{intoDeviceId}` (conferma "stesso dispositivo": il dispositivo viene unito a `intoDeviceId` e rimosso; risponde con il dispositivo unito; `device:classify`; `400 SAME_DEVICE`) · `POST /devices/{id}/same-as/dismiss` `{otherDeviceId}` (`device:classify`). Audit `DEVICE_MERGED`, `DEVICE_SAME_AS_DISMISSED`. Vedi ADR-074.
+
+> **Implementato (M20)**: `GET /devices/{id}` con `customName`, `displayName`, `identity` (per `HOSTNAME`, `MANUFACTURER`, `MODEL`, `PRODUCT_CODE`, `FIRMWARE`, `OS`, `DEVICE_TYPE`, `CPE`: `value`, `status` `VERIFIED`/`PROBABLE`/`UNKNOWN`, `confidence`, `sources`, `userConfirmed`, `conflict`) e `identificationHistory`; `identifications[].status` · `PUT /devices/{id}/identity` `{field, value}` (conferma o correzione dell'utente, `value: null` la rimuove; campi `MANUFACTURER`/`MODEL`/`PRODUCT_CODE`/`FIRMWARE`/`CPE`/`OS`; `400 INVALID_FIELD`/`INVALID_VALUE`/`INVALID_OS`/`INVALID_CPE`) · `PUT /devices/{id}/name` `{name}` (max 100, `null` cancella; `400 INVALID_NAME`). Entrambi con `device:classify`; audit `DEVICE_IDENTITY_CONFIRMED`, `DEVICE_RENAMED`. Vedi ADR-076.
+
+> **Implementato (M24, parte 1)**: `GET`/`POST /homes/{homeId}/people` · `PUT`/`DELETE /people/{id}` · `PUT`/`DELETE /devices/{deviceId}/people/{personId}` (associa o conferma / toglie, non riproposta). Permessi `person:read`, `person:manage`. Vedi [30-DEVICE-PEOPLE.md](30-DEVICE-PEOPLE.md) §4 e ADR-081.
+> **Implementato (M24, parti 2–3)**: `POST /agent/scans/{scanId}/results` accetta `identities` (`[{ip, account, source: DIRECTORY|FIREWALL, observedAt}]`, max 500, in un batch separato: `400 INVALID_BATCH` se insieme a host, porte, icone o Home Assistant). Indirizzi fuori rete scartati. Vedi [30-DEVICE-PEOPLE.md](30-DEVICE-PEOPLE.md) §8 e ADR-083.
 
 > **Implementato (M9)**: `GET /scans/{id}/ports` (porte aperte e servizi) · `GET /devices/{id}` con `services` (contatori, porte, protocolli dell'ultima scansione delle porte) · profili `QUICK`/`STANDARD` in `POST /homes/{homeId}/scans`. Vedi [18-PORT-SCANNING.md](18-PORT-SCANNING.md) §8.
 

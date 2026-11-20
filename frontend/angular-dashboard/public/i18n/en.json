@@ -434,7 +434,17 @@
       "DISCOVERY": "finding devices",
       "PORTS": "checking ports and services",
       "UPLOADING": "uploading results"
-    }
+    },
+    "delete": "Delete",
+    "deleteConfirm": "Delete permanently",
+    "keep": "Cancel",
+    "deleteWarning": "Permanent deletion: devices and findings seen only by this scan are deleted too.",
+    "deleted": "Deleted: {{scans}} scans, {{devices}} devices, {{findings}} findings.",
+    "clearTitle": "Clear inventory",
+    "clear": "Clear the home inventory",
+    "clearConfirm": "Clear permanently",
+    "clearHint": "Deletes all scans, devices, findings, people, reports and alerts of the home. Home, networks and agent stay.",
+    "clearWarning": "Permanent operation without backup: it cannot be undone."
   },
   "devices": {
     "title": "Devices",
@@ -451,8 +461,44 @@
     "show": "Details",
     "manual": "manual",
     "randomized": "random MAC",
+    "notInLastScan": "not seen in the last scan",
     "randomizedNote": "The device uses a random MAC address (privacy): it may change over time and the manufacturer cannot be derived from it.",
     "probableSameAs": "Probably the same device as \"{{name}}\".",
+    "merge": "Yes, it is the same device",
+    "mergeWarning": "If you confirm, the interfaces, address history and issues of this device move to \"{{name}}\" and this entry is removed. This cannot be undone.",
+    "mergeConfirm": "Confirm merge",
+    "cancel": "Cancel",
+    "notSame": "No, they are different devices",
+    "interfaces": {
+      "title": "Network interfaces",
+      "vendor": "Network card maker (OUI)",
+      "seenVia": "Seen via",
+      "none": "No MAC address detected."
+    },
+    "addressesTable": {
+      "title": "IP addresses and history",
+      "address": "Address",
+      "type": "Type",
+      "firstSeen": "First seen",
+      "timesSeen": "Scans",
+      "current": "current",
+      "past": "no longer seen",
+      "note": "Temporary (privacy) IPv6 addresses not seen for 30 days are removed from the history. Only addresses of authorized networks are recorded."
+    },
+    "scope": {
+      "PRIVATE": "private",
+      "PUBLIC": "public",
+      "LINK_LOCAL": "link-local",
+      "LOOPBACK": "loopback",
+      "UNIQUE_LOCAL": "unique local (ULA)",
+      "GLOBAL": "global",
+      "MULTICAST": "multicast",
+      "OTHER": "other"
+    },
+    "interfaceId": {
+      "EUI64": "derived from the MAC (EUI-64)",
+      "RANDOM": "random (privacy)"
+    },
     "overall": "Overall confidence",
     "suggestion": "The latest scans point with good confidence to the category \"{{category}}\": your manual choice stays until you change it.",
     "setCategory": "Category",
@@ -490,6 +536,9 @@
       "SMART_PLUG": "Smart plug",
       "SMART_SPEAKER": "Smart speaker",
       "IOT": "IoT device",
+      "VOIP_PHONE": "VoIP phone",
+      "NETWORK_DEVICE": "Network device",
+      "SERVER": "Server",
       "UNKNOWN_DEVICE": "Unidentified"
     },
     "fields": {
@@ -500,7 +549,44 @@
       "MODEL": "Model",
       "OS": "Operating system",
       "FIRMWARE": "Firmware",
-      "DEVICE_TYPE": "Device type"
+      "DEVICE_TYPE": "Device type",
+      "PRODUCT_CODE": "Product code",
+      "CPE": "CPE"
+    },
+    "photo": {
+      "source": {
+        "DEVICE": "Icon provided by the device itself (UPnP), fetched automatically by the scan",
+        "USER": "Photo uploaded by you: scans never replace it"
+      },
+      "none": "No image: the device does not expose one. You can upload a photo.",
+      "upload": "Upload photo",
+      "remove": "Remove my photo",
+      "hint": "PNG or JPEG, at most 1 MB.",
+      "invalid": "Only PNG or JPEG photos up to 1 MB."
+    },
+    "card": {
+      "title": "Device card",
+      "customName": "Custom name",
+      "customNameHint": "Scans never change it.",
+      "save": "Save",
+      "clear": "Remove",
+      "confirm": "Confirm",
+      "correct": "Correct",
+      "unconfirm": "Undo confirmation",
+      "userConfirmed": "Confirmed by you",
+      "sources": "Sources",
+      "statusRule": "Verified: declared by the device, confirmed by you or by two concordant independent sources. Probable: inferred or with conflicting sources. Unknown: no source.",
+      "history": "Identification history",
+      "noHistory": "No change recorded.",
+      "origin": {
+        "SCAN": "Scan",
+        "USER": "User"
+      }
+    },
+    "status": {
+      "VERIFIED": "Verified",
+      "PROBABLE": "Probable",
+      "UNKNOWN": "Unknown"
     }
   },
   "integrations": {
@@ -670,7 +756,11 @@
     "note": "Payment happens on Stripe: card data never passes through this dashboard. The plan is updated as soon as Stripe confirms the payment. A downgrade deletes no data, but no new resources can be created beyond the limits.",
     "checkoutSuccess": "Thank you! The plan will be updated as soon as Stripe confirms the payment (usually a few seconds).",
     "checkoutCancel": "Payment cancelled: the plan has not changed.",
-    "plans": { "FREE": "Free", "PLUS": "Plus", "PRO": "Pro" },
+    "plans": {
+      "FREE": "Free",
+      "PLUS": "Plus",
+      "PRO": "Pro"
+    },
     "limits": {
       "homes": "Homes",
       "users": "Users",
@@ -989,6 +1079,8 @@
     }
   },
   "errors": {
+    "INVALID_IMAGE": "Only PNG or JPEG photos up to 4096 pixels per side.",
+    "IMAGE_TOO_LARGE": "The photo must not exceed 1 MB.",
     "PLAN_NOT_AVAILABLE": "This plan is not available for your account.",
     "SUBSCRIPTION_EXISTS": "You already have a subscription: change it from \"Manage subscription\".",
     "NO_SUBSCRIPTION": "You do not have a subscription yet.",
@@ -1049,5 +1141,32 @@
     "REASON_REQUIRED": "Please give a reason.",
     "INVALID_REASON": "The reason is too long (500 characters at most).",
     "FINDING_RESOLVED": "The finding is already resolved: it reopens by itself if a scan detects it again."
+  },
+  "people": {
+    "person": "Person",
+    "title": "People",
+    "homeTitle": "People of the home",
+    "probable": "probable",
+    "none": "No person associated.",
+    "confirm": "Confirm",
+    "remove": "Remove",
+    "delete": "Delete",
+    "assign": "Assign to",
+    "assignButton": "Assign",
+    "newPerson": "New person",
+    "createButton": "Create and assign",
+    "deviceCount": "{{count}} devices",
+    "status": {
+      "PROBABLE": "Probable",
+      "CONFIRMED": "Confirmed"
+    },
+    "source": {
+      "USER": "entered manually",
+      "DEVICE_NAME": "from the device name",
+      "HOME_ASSISTANT": "from Home Assistant",
+      "DIRECTORY": "from Active Directory",
+      "FIREWALL": "from the firewall"
+    },
+    "privacyNote": "Automatic associations are only probable: confirm or remove them. A removed association is not proposed again. No location, presence times or traffic are stored. Before using them on employees or other people, inform them (GDPR) and, at work, check the rules on remote monitoring of workers."
   }
 }

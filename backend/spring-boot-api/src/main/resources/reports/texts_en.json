@@ -151,6 +151,9 @@
       "SMART_PLUG": "Smart plug",
       "SMART_SPEAKER": "Smart speaker",
       "IOT": "IoT device",
+      "VOIP_PHONE": "VoIP phone",
+      "NETWORK_DEVICE": "Network device",
+      "SERVER": "Server",
       "UNKNOWN_DEVICE": "Unidentified"
     }
   }

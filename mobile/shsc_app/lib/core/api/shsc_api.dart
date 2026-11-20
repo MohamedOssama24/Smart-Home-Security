@@ -156,6 +156,10 @@ class ShscApi {
   Future<List<Device>> devices(String homeId) async =>
       (await _list('/api/v1/homes/${_seg(homeId)}/devices')).map(Device.fromJson).toList();
 
+  /// People of the home with their devices (M24), one entry per (person, device).
+  Future<List<DevicePerson>> devicePeople(String homeId) async =>
+      DevicePerson.fromPeople(await _list('/api/v1/homes/${_seg(homeId)}/people'));
+
   Future<Device> device(String deviceId) async => Device.fromJson(await _get('/api/v1/devices/${_seg(deviceId)}'));
 
   Future<List<Scan>> scans(String homeId) async =>

@@ -10,7 +10,7 @@ import 'package:dio/dio.dart';
 class FakeBackend {
   FakeBackend({Set<String>? permissions})
       : permissions = permissions ??
-            {'home:read', 'finding:read', 'device:read', 'scan:read', 'scan:create'};
+            {'home:read', 'finding:read', 'device:read', 'scan:read', 'scan:create', 'person:read'};
 
   static const email = 'owner-mock@example.test';
   static const password = 'MOCK-password-42';
@@ -79,6 +79,31 @@ class FakeBackend {
           {'protocol': 'TCP', 'port': 443, 'service': {'name': 'https', 'product': 'mock-httpd', 'version': '1.0'}},
         ],
       },
+      'interfaces': [
+        {'mac': '00:11:22:33:44:55', 'macRandomized': false, 'vendor': 'MockNet', 'agentInterface': 'eth0',
+          'current': true},
+      ],
+      'addressHistory': [
+        {'address': '192.168.60.1', 'family': 4, 'scope': 'PRIVATE', 'interfaceId': null, 'current': true,
+          'lastSeenAt': '2026-11-18T09:10:00Z'},
+        {'address': 'fd00:60::211:22ff:fe33:4455', 'family': 6, 'scope': 'UNIQUE_LOCAL', 'interfaceId': 'EUI64',
+          'current': false, 'lastSeenAt': '2026-11-17T09:10:00Z'},
+      ],
+      'customName': 'Router MOCK soggiorno',
+      'identity': [
+        {'field': 'MANUFACTURER', 'value': 'MockNet', 'status': 'VERIFIED', 'confidence': 'HIGH',
+          'sources': ['SSDP'], 'userConfirmed': false, 'conflict': false},
+        {'field': 'FIRMWARE', 'value': '2.0', 'status': 'VERIFIED', 'confidence': 'HIGH',
+          'sources': ['USER'], 'userConfirmed': true, 'conflict': true},
+        {'field': 'CPE', 'value': 'cpe:2.3:h:mocknet:mr-1:*:*:*:*:*:*:*:*', 'status': 'PROBABLE',
+          'confidence': 'MEDIUM', 'sources': ['DERIVED'], 'userConfirmed': false, 'conflict': false},
+        {'field': 'PRODUCT_CODE', 'value': null, 'status': 'UNKNOWN', 'confidence': null, 'sources': [],
+          'userConfirmed': false, 'conflict': false},
+      ],
+      'identificationHistory': [
+        {'field': 'FIRMWARE', 'oldValue': '1.0', 'newValue': '2.0', 'oldStatus': 'VERIFIED',
+          'newStatus': 'VERIFIED', 'origin': 'USER', 'scanId': null, 'changedAt': '2026-11-18T10:00:00Z'},
+      ],
     },
     {
       'id': 'd2', 'homeId': 'h1', 'mac': '02:aa:bb:cc:dd:ee', 'macRandomized': true, 'ip': '192.168.60.9',
@@ -162,6 +187,15 @@ class FakeBackend {
             : overview.map((h) => {...h, 'security': null}).toList());
       case ('GET', ['homes', 'h1', 'devices']):
         return (200, devices);
+      case ('GET', ['homes', 'h1', 'people']):
+        if (!permissions.contains('person:read')) {
+          return (403, problem(403, 'FORBIDDEN'));
+        }
+        return (200, [ // [MOCK] person
+          {'id': 'p1', 'homeId': 'h1', 'name': 'Marco', 'origin': 'DEVICE_NAME', 'devices': [
+            {'deviceId': 'd1', 'status': 'PROBABLE', 'source': 'DEVICE_NAME', 'evidence': 'Router-di-Marco'},
+          ]},
+        ]);
       case ('GET', ['devices', final id]):
         final d = devices.where((d) => d['id'] == id).firstOrNull;
         return d == null ? (404, problem(404, 'NOT_FOUND')) : (200, d);

@@ -434,7 +434,17 @@
       "DISCOVERY": "ricerca dispositivi",
       "PORTS": "controllo porte e servizi",
       "UPLOADING": "invio risultati"
-    }
+    },
+    "delete": "Elimina",
+    "deleteConfirm": "Elimina definitivamente",
+    "keep": "Annulla",
+    "deleteWarning": "Eliminazione definitiva: spariscono anche i dispositivi e i problemi visti solo da questa scansione.",
+    "deleted": "Eliminati: {{scans}} scansioni, {{devices}} dispositivi, {{findings}} problemi.",
+    "clearTitle": "Svuota inventario",
+    "clear": "Svuota inventario dell'abitazione",
+    "clearConfirm": "Svuota definitivamente",
+    "clearHint": "Cancella tutte le scansioni, i dispositivi, i problemi, le persone, i report e gli avvisi dell'abitazione. Restano abitazione, reti e agent.",
+    "clearWarning": "Operazione definitiva, senza copia di riserva: non si può annullare."
   },
   "devices": {
     "title": "Dispositivi",
@@ -451,8 +461,44 @@
     "show": "Dettagli",
     "manual": "manuale",
     "randomized": "MAC casuale",
+    "notInLastScan": "non visto nell'ultima scansione",
     "randomizedNote": "Il dispositivo usa un indirizzo MAC casuale (privacy): può cambiare nel tempo e il produttore non è ricavabile dal MAC.",
     "probableSameAs": "Probabilmente è lo stesso dispositivo di \"{{name}}\".",
+    "merge": "Sì, è lo stesso dispositivo",
+    "mergeWarning": "Confermando, interfacce, storico degli indirizzi e problemi di questo dispositivo passano a \"{{name}}\" e questa voce viene rimossa. L'operazione non è reversibile.",
+    "mergeConfirm": "Conferma unione",
+    "cancel": "Annulla",
+    "notSame": "No, sono dispositivi diversi",
+    "interfaces": {
+      "title": "Interfacce di rete",
+      "vendor": "Produttore scheda (OUI)",
+      "seenVia": "Rilevata tramite",
+      "none": "Nessun indirizzo MAC rilevato."
+    },
+    "addressesTable": {
+      "title": "Indirizzi IP e storico",
+      "address": "Indirizzo",
+      "type": "Tipo",
+      "firstSeen": "Prima rilevazione",
+      "timesSeen": "Scansioni",
+      "current": "attuale",
+      "past": "non più visto",
+      "note": "Gli indirizzi IPv6 temporanei (privacy) non visti da 30 giorni vengono eliminati dallo storico. Sono registrati solo gli indirizzi delle reti autorizzate."
+    },
+    "scope": {
+      "PRIVATE": "privato",
+      "PUBLIC": "pubblico",
+      "LINK_LOCAL": "link-local",
+      "LOOPBACK": "loopback",
+      "UNIQUE_LOCAL": "locale univoco (ULA)",
+      "GLOBAL": "globale",
+      "MULTICAST": "multicast",
+      "OTHER": "altro"
+    },
+    "interfaceId": {
+      "EUI64": "derivato dal MAC (EUI-64)",
+      "RANDOM": "casuale (privacy)"
+    },
     "overall": "Affidabilità complessiva",
     "suggestion": "Le ultime scansioni indicano con buona affidabilità la categoria \"{{category}}\": la tua scelta manuale resta valida finché non la cambi.",
     "setCategory": "Categoria",
@@ -490,6 +536,9 @@
       "SMART_PLUG": "Presa smart",
       "SMART_SPEAKER": "Altoparlante smart",
       "IOT": "Dispositivo IoT",
+      "VOIP_PHONE": "Telefono VoIP",
+      "NETWORK_DEVICE": "Apparato di rete",
+      "SERVER": "Server",
       "UNKNOWN_DEVICE": "Non identificato"
     },
     "fields": {
@@ -500,7 +549,44 @@
       "MODEL": "Modello",
       "OS": "Sistema operativo",
       "FIRMWARE": "Firmware",
-      "DEVICE_TYPE": "Tipo di dispositivo"
+      "DEVICE_TYPE": "Tipo di dispositivo",
+      "PRODUCT_CODE": "Codice prodotto",
+      "CPE": "CPE"
+    },
+    "photo": {
+      "source": {
+        "DEVICE": "Icona fornita dal dispositivo stesso (UPnP), recuperata automaticamente dalla scansione",
+        "USER": "Foto caricata da te: le scansioni non la sostituiscono mai"
+      },
+      "none": "Nessuna immagine: il dispositivo non ne espone una. Puoi caricare una foto.",
+      "upload": "Carica foto",
+      "remove": "Rimuovi la mia foto",
+      "hint": "PNG o JPEG, massimo 1 MB.",
+      "invalid": "Solo foto PNG o JPEG fino a 1 MB."
+    },
+    "card": {
+      "title": "Scheda dispositivo",
+      "customName": "Nome personalizzato",
+      "customNameHint": "Le scansioni non lo modificano mai.",
+      "save": "Salva",
+      "clear": "Rimuovi",
+      "confirm": "Conferma",
+      "correct": "Correggi",
+      "unconfirm": "Annulla conferma",
+      "userConfirmed": "Confermato da te",
+      "sources": "Fonti",
+      "statusRule": "Verificato: dichiarato dal dispositivo, confermato da te o da due fonti indipendenti concordanti. Probabile: dedotto o con fonti in conflitto. Sconosciuto: nessuna fonte.",
+      "history": "Storico identificazioni",
+      "noHistory": "Nessuna modifica registrata.",
+      "origin": {
+        "SCAN": "Scansione",
+        "USER": "Utente"
+      }
+    },
+    "status": {
+      "VERIFIED": "Verificato",
+      "PROBABLE": "Probabile",
+      "UNKNOWN": "Sconosciuto"
     }
   },
   "integrations": {
@@ -670,7 +756,11 @@
     "note": "Il pagamento avviene su Stripe: i dati della carta non passano da questa dashboard. Il piano si aggiorna appena Stripe conferma il pagamento. Riducendo il piano nessun dato viene cancellato, ma non si possono creare nuove risorse oltre i limiti.",
     "checkoutSuccess": "Grazie! Il piano si aggiornerà appena Stripe conferma il pagamento (di solito pochi secondi).",
     "checkoutCancel": "Pagamento annullato: il piano non è cambiato.",
-    "plans": { "FREE": "Free", "PLUS": "Plus", "PRO": "Pro" },
+    "plans": {
+      "FREE": "Free",
+      "PLUS": "Plus",
+      "PRO": "Pro"
+    },
     "limits": {
       "homes": "Abitazioni",
       "users": "Utenti",
@@ -989,6 +1079,8 @@
     }
   },
   "errors": {
+    "INVALID_IMAGE": "Solo foto PNG o JPEG fino a 4096 pixel per lato.",
+    "IMAGE_TOO_LARGE": "La foto non deve superare 1 MB.",
     "PLAN_NOT_AVAILABLE": "Questo piano non è disponibile per il tuo account.",
     "SUBSCRIPTION_EXISTS": "Hai già un abbonamento: modificalo da \"Gestisci abbonamento\".",
     "NO_SUBSCRIPTION": "Non hai ancora un abbonamento.",
@@ -1049,5 +1141,32 @@
     "REASON_REQUIRED": "Indica una motivazione.",
     "INVALID_REASON": "La motivazione è troppo lunga (massimo 500 caratteri).",
     "FINDING_RESOLVED": "Il problema è già risolto: si riaprirà da solo se una scansione lo rileva di nuovo."
+  },
+  "people": {
+    "person": "Persona",
+    "title": "Persone",
+    "homeTitle": "Persone dell'abitazione",
+    "probable": "probabile",
+    "none": "Nessuna persona associata.",
+    "confirm": "Conferma",
+    "remove": "Togli",
+    "delete": "Elimina",
+    "assign": "Associa a",
+    "assignButton": "Associa",
+    "newPerson": "Nuova persona",
+    "createButton": "Crea e associa",
+    "deviceCount": "{{count}} dispositivi",
+    "status": {
+      "PROBABLE": "Probabile",
+      "CONFIRMED": "Confermata"
+    },
+    "source": {
+      "USER": "inserita a mano",
+      "DEVICE_NAME": "dal nome del dispositivo",
+      "HOME_ASSISTANT": "da Home Assistant",
+      "DIRECTORY": "da Active Directory",
+      "FIREWALL": "dal firewall"
+    },
+    "privacyNote": "Le associazioni automatiche sono solo probabili: confermale o toglile. Una associazione tolta non viene riproposta. Non vengono salvati posizione, orari di presenza o traffico. Prima di usarle su dipendenti o altre persone, informale (GDPR) e, sul lavoro, verifica le regole sul controllo a distanza dei lavoratori."
   }
 }

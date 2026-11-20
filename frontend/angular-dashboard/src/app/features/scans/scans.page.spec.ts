@@ -203,5 +203,49 @@ describe('ScansPage', () => {
     const fixture = await setup([{ ...SCAN, status: 'RUNNING' }], [...ME.permissions, 'scan:read']);
     expect(el(fixture.nativeElement, 'start-scan')).toBeNull();
     expect(el(fixture.nativeElement, 'cancel-scan')).toBeNull();
+    expect(el(fixture.nativeElement, 'clear-home')).toBeNull();
+  });
+
+  it('deletes a finished scan and clears the inventory only after a second confirmation', async () => {
+    const done = { ...SCAN, status: 'COMPLETED' as const, completedAt: '2026-11-17T10:05:00Z' };
+    const running = { ...SCAN, id: 's2', status: 'RUNNING' as const };
+    const fixture = await setup([running, done], [...ME.permissions, 'scan:read', 'scan:create', 'scan:delete']);
+    const page = fixture.nativeElement as HTMLElement;
+    expect(el(page, 'delete-s2')).toBeNull(); // a running scan cannot be deleted
+    expect(el(page, 'clear-home')).toBeNull(); // nor the inventory while a scan runs
+    el(page, 'cancel-scan')!.click();
+    (await nextRequest(http, '/api/v1/scans/s2/cancel')).flush({ ...running, cancelRequestedAt: '2026-11-17T10:06:00Z' });
+    const cancelled = { ...running, status: 'CANCELLED' as const };
+    (await nextRequest(http, '/api/v1/homes/h1/scans')).flush([cancelled, done]);
+    (await nextRequest(http, '/api/v1/scans/s2')).flush(cancelled);
+    (await nextRequest(http, '/api/v1/scans/s2/devices')).flush([]);
+    (await nextRequest(http, '/api/v1/scans/s2/integrations')).flush({ homeAssistant: null });
+    await settle();
+    fixture.detectChanges();
+
+    el(page, 'delete-s1')!.click();
+    fixture.detectChanges();
+    expect(page.textContent).toContain('Eliminazione definitiva');
+    el(page, 'delete-confirm-s1')!.click();
+    const del = await nextRequest(http, '/api/v1/scans/s1');
+    expect(del.request.method).toBe('DELETE');
+    del.flush({ scans: 1, devices: 2, findings: 0 });
+    (await nextRequest(http, '/api/v1/homes/h1/scans')).flush([cancelled]);
+    await settle();
+    fixture.detectChanges();
+    expect(el(page, 'deleted-info')!.textContent).toContain('2 dispositivi');
+
+    el(page, 'clear-home')!.click();
+    fixture.detectChanges();
+    el(page, 'clear-confirm')!.click();
+    const clear = await nextRequest(http, '/api/v1/homes/h1/inventory');
+    expect(clear.request.method).toBe('DELETE');
+    clear.flush({ scans: 1, devices: 0, findings: 0 });
+    (await nextRequest(http, '/api/v1/homes/h1/scans')).flush([]);
+    await settle();
+    fixture.detectChanges();
+    expect(el(page, 'scan-detail')).toBeNull();
+    expect(el(page, 'deleted-info')!.textContent).toContain('1 scansioni, 0 dispositivi');
+    expect(el(page, 'history')).toBeNull();
   });
 });

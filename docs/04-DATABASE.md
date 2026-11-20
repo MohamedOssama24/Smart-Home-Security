@@ -81,6 +81,15 @@
 | `device_observations` | id, tenant_id, device_id, scan_id, ip, mac, method (`ARP`,`ICMP`,`MDNS`,`SSDP`,`ROUTER`,`DHCP`,`NETBIOS`,`RDNS`), interface, raw jsonb, observed_at | partizionata per mese |
 | `device_identifications` | id, device_id, scan_id, field (`IP`,`MAC`,`MANUFACTURER`,`HOSTNAME`,`DEVICE_TYPE`,`MODEL`,`OS`,`FIRMWARE`), value, confidence (`HIGH`/`MEDIUM`/`LOW`), sources jsonb, method, ruleset_version | **confidenza per campo** |
 | `device_category_changes` | id, device_id, old_category, new_category, source (`AUTO`/`MANUAL`), changed_by, changed_at | storico correzioni |
+| `device_interfaces` (M19, V018) | id, tenant_id, home_id, device_id, mac, mac_randomized, vendor (OUI), agent_interface, first/last_seen_at, first/last_scan_id | unique `(home_id, mac)`: identità del dispositivo = una delle sue interfacce; RLS |
+| `device_addresses` (M19, V018) | id, tenant_id, device_id, address inet, mac, first/last_seen_at, first/last_scan_id, times_seen | storico indirizzi IPv4/IPv6, unique `(device_id, address)`; ambito e tipo di identificativo calcolati dal backend; IPv6 globali casuali eliminati dopo 30 giorni, max 256 per dispositivo; RLS |
+| `device_identifications` (M20, V019) | + field `PRODUCT_CODE`, `CPE`; + status (`VERIFIED`/`PROBABLE`) | stato per campo secondo ADR-076; `UNKNOWN` = nessuna riga |
+| `devices.custom_name` (M20, V019) | text, 1–100 caratteri | nome dato dall'utente, mai toccato dalle scansioni |
+| `device_identity_confirmations` (M20, V019) | tenant_id, device_id, field, value, confirmed_by, confirmed_at | unique `(device_id, field)`; conferme/correzioni dell'utente che prevalgono sulle scansioni; RLS |
+| `device_identification_history` (M20, V019) | tenant_id, device_id, field, old/new_value, old/new_status, origin (`SCAN`/`USER`), scan_id, changed_by, changed_at | cambi di valore o stato, max 50 per campo; RLS |
+| `scan_device_icons`, `device_images` (M23, V020) | tenant_id, device_id, source (`DEVICE`/`USER`), origin (`UPNP`/`UPLOAD`), content_type (PNG/JPEG), data (≤1 MB), sha256, width, height, scan_id, uploaded_by | PK `(device_id, source)`; icona dichiarata dal dispositivo e foto dell'utente (ADR-077); RLS |
+| `devices.detected_category` / `manual_category` (V021) | + `VOIP_PHONE`, `NETWORK_DEVICE`, `SERVER` | nuove categorie (ADR-079) |
+| `devices.same_as_dismissed` (M19) | uuid[] (max 64) | coppie "non è lo stesso dispositivo" indicate dall'utente |
 | `open_ports` | id, tenant_id, device_id, scan_id, protocol (`TCP`/`UDP`), port, state (`OPEN`,`CLOSED`,`FILTERED`,`OPEN_FILTERED`,`UNKNOWN`), reason, first_seen_at, last_seen_at | unique `(scan_id, device_id, protocol, port)` |
 | `detected_services` | id, open_port_id, name, product, version, status (`PROBABLE`/`CONFIRMED`), confidence, evidence jsonb, tls jsonb | |
 | `detected_protocols` | id, device_id, scan_id, protocol (`MDNS`,`SSDP`,`UPNP`,`ONVIF`,`MQTT`,`RTSP`,`SMB`,`SNMP`,`COAP`…), details jsonb, confidence | |

@@ -137,6 +137,13 @@ export interface PortMapping {
   description?: string;
 }
 
+/** What a deletion removed. */
+export interface DeletedCounts {
+  scans: number;
+  devices: number;
+  findings: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ScansApi {
   private readonly http = inject(HttpClient);
@@ -156,6 +163,16 @@ export class ScansApi {
 
   get(scanId: string): Observable<Scan> {
     return this.http.get<Scan>(`/api/v1/scans/${encodeURIComponent(scanId)}`);
+  }
+
+  /** Irreversible: deletes a finished scan; devices and findings seen only by it are deleted too. */
+  remove(scanId: string): Observable<DeletedCounts> {
+    return this.http.delete<DeletedCounts>(`/api/v1/scans/${encodeURIComponent(scanId)}`);
+  }
+
+  /** Irreversible: deletes all scans, devices, findings, people, reports and alerts of the home. */
+  clearHome(homeId: string): Observable<DeletedCounts> {
+    return this.http.delete<DeletedCounts>(`/api/v1/homes/${encodeURIComponent(homeId)}/inventory`);
   }
 
   cancel(scanId: string): Observable<Scan> {

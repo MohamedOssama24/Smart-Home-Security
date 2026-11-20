@@ -107,13 +107,17 @@ type upnpRoot struct {
 }
 
 type upnpDevice struct {
-	DeviceType   string        `xml:"deviceType"`
-	FriendlyName string        `xml:"friendlyName"`
-	Manufacturer string        `xml:"manufacturer"`
-	ModelName    string        `xml:"modelName"`
-	ModelNumber  string        `xml:"modelNumber"`
-	Services     []upnpService `xml:"serviceList>service"`
-	Devices      []upnpDevice  `xml:"deviceList>device"`
+	DeviceType   string `xml:"deviceType"`
+	FriendlyName string `xml:"friendlyName"`
+	Manufacturer string `xml:"manufacturer"`
+	ModelName    string `xml:"modelName"`
+	ModelNumber  string `xml:"modelNumber"`
+	// non-standard elements used by several vendors for the firmware version (M20)
+	FirmwareVersion string        `xml:"firmwareVersion"`
+	SoftwareVersion string        `xml:"softwareVersion"`
+	Icons           []upnpIcon    `xml:"iconList>icon"` // M23
+	Services        []upnpService `xml:"serviceList>service"`
+	Devices         []upnpDevice  `xml:"deviceList>device"`
 }
 
 type upnpService struct {

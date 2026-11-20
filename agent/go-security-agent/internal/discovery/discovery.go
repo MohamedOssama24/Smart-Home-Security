@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/netip"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,6 +43,14 @@ const (
 	MethodNDP     = "NDP"
 	MethodTR064   = "TR064"
 	MethodSNMP    = "SNMP"
+
+	// methodGlobalNeighbour marks a global IPv6 neighbour outside the targets: kept apart by the
+	// collector and only attached to the in-scope observations with the same MAC.
+	methodGlobalNeighbour = "global-neighbour"
+	// DetailGlobalIPv6 lists those addresses in the details of an in-scope observation.
+	DetailGlobalIPv6 = "globalIpv6"
+	maxGlobalPerMAC  = 8
+	maxGlobalTotal   = 256
 )
 
 // Warning codes (translated by the dashboard).
@@ -115,6 +124,7 @@ type Observation struct {
 	Hostname   string
 	Details    map[string]any
 	ObservedAt time.Time
+	Icon       *Icon // M23: icon declared by the device (UPnP), uploaded in its own batches
 }
 
 // Options bound the probing; Progress is called after each probed host.
@@ -136,14 +146,16 @@ type techniques struct {
 	icmp    func(ctx context.Context, n Network, o Options, found func(ip netip.Addr, ttl int), probed func()) []string
 	mdns    func(ctx context.Context, n Network, emit func(Observation)) []string
 	ssdp    func(ctx context.Context, n Network, emit func(Observation)) []string
+	ssdpUni func(ctx context.Context, n Network, hosts []netip.Addr, emit func(Observation)) []string
+	mdnsUni func(ctx context.Context, n Network, hosts []netip.Addr, emit func(Observation)) []string
 	ndp     func(ctx context.Context, n Network, emit func(Observation)) []string
 	netbios func(ctx context.Context, n Network, hosts []netip.Addr, emit func(Observation)) []string
 	rdns    func(ctx context.Context, hosts []netip.Addr, emit func(Observation))
 	router  func(ctx context.Context, cfg RouterConfig, inScope func(netip.Addr) bool, emit func(Observation)) []string
 }
 
-var defaultTechniques = techniques{arp: resolveARP, icmp: pingSweep, mdns: queryMDNS, ssdp: searchSSDP,
-	ndp: discoverNDP, netbios: queryNetBIOS, rdns: reverseDNS, router: queryRouter}
+var defaultTechniques = techniques{arp: resolveARP, icmp: pingSweep, mdns: queryMDNS, ssdp: searchSSDP, ssdpUni: searchSSDPUnicast,
+	mdnsUni: queryMDNSUnicast, ndp: discoverNDP, netbios: queryNetBIOS, rdns: reverseDNS, router: queryRouter}
 
 // LocalInterfaces lists the interfaces that are up, with their unicast addresses.
 func LocalInterfaces() ([]Interface, error) {
@@ -255,7 +267,7 @@ func Run(ctx context.Context, plan Plan, o Options) ([]Observation, []string) {
 	if o.tech != nil {
 		t = *o.tech
 	}
-	c := &collector{plan: plan, now: o.Now, obs: map[obsKey]*Observation{}}
+	c := &collector{plan: plan, now: o.Now, obs: map[obsKey]*Observation{}, global: map[netip.Addr]string{}}
 	w := &warnings{set: map[string]bool{}}
 	w.add(plan.Warnings...)
 	for _, n := range plan.Networks {
@@ -264,7 +276,7 @@ func Run(ctx context.Context, plan Plan, o Options) ([]Observation, []string) {
 			if len(n.Interface.MAC) == 6 {
 				mac = n.Interface.MAC.String()
 			}
-			c.add(Observation{IP: n.Local, MAC: mac, Method: MethodSelf, Interface: n.Interface.Name})
+			c.add(Observation{IP: n.Local, MAC: mac, Method: MethodSelf, Interface: n.Interface.Name, Hostname: selfName()})
 		}
 	}
 
@@ -332,6 +344,21 @@ func Run(ctx context.Context, plan Plan, o Options) ([]Observation, []string) {
 	}
 	wg.Wait()
 
+	// M23: hosts found that did not answer the multicast UPnP search / mDNS query are asked
+	// directly (name and services the device declares about itself)
+	if ctx.Err() == nil {
+		for _, n := range v4 {
+			ssdpList, mdnsList := c.hostsWithout(n, MethodSSDP), c.hostsWithout(n, MethodMDNS)
+			if len(ssdpList) > 0 {
+				parallel(func() { w.add(t.ssdpUni(ctx, n, ssdpList, c.addOn(n))...) })
+			}
+			if len(mdnsList) > 0 {
+				parallel(func() { w.add(t.mdnsUni(ctx, n, mdnsList, c.addOn(n))...) })
+			}
+		}
+		wg.Wait()
+	}
+
 	// names of the hosts found: NetBIOS on each connected IPv4 network, then reverse DNS
 	if ctx.Err() == nil {
 		for _, n := range v4 {
@@ -366,10 +393,20 @@ type collector struct {
 	plan Plan
 	now  func() time.Time
 	obs  map[obsKey]*Observation
+	// global IPv6 neighbours outside the targets (address -> MAC): never listed as hosts
+	global map[netip.Addr]string
 }
 
 func (c *collector) add(o Observation) {
 	o.IP = o.IP.Unmap().WithZone("")
+	if o.Method == methodGlobalNeighbour {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if isGlobal6(o.IP) && !c.plan.InScope(o.IP) && o.MAC != "" && len(c.global) < maxGlobalTotal {
+			c.global[o.IP] = strings.ToLower(o.MAC)
+		}
+		return
+	}
 	if !o.IP.IsValid() || !c.plan.InScope(o.IP) {
 		return
 	}
@@ -393,6 +430,9 @@ func (c *collector) add(o Observation) {
 	if prev.Interface == "" {
 		prev.Interface = o.Interface
 	}
+	if prev.Icon == nil {
+		prev.Icon = o.Icon
+	}
 	for k, v := range o.Details {
 		if prev.Details == nil {
 			prev.Details = map[string]any{}
@@ -411,6 +451,20 @@ func (c *collector) addOn(n Network) func(Observation) {
 		}
 		c.add(o)
 	}
+}
+
+// hostsWithout lists the hosts found in n that have no observation of the given method.
+func (c *collector) hostsWithout(n Network, method string) []netip.Addr {
+	var out []netip.Addr
+	for _, h := range c.hostsIn(n) {
+		c.mu.Lock()
+		_, done := c.obs[obsKey{ip: h, method: method}]
+		c.mu.Unlock()
+		if !done {
+			out = append(out, h)
+		}
+	}
+	return out
 }
 
 // count is the number of distinct addresses found.
@@ -450,8 +504,24 @@ func (c *collector) hostsIn(n Network) []netip.Addr {
 func (c *collector) list() []Observation {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	byMAC := map[string][]string{}
+	for ip, mac := range c.global {
+		byMAC[mac] = append(byMAC[mac], ip.String())
+	}
 	out := make([]Observation, 0, len(c.obs))
 	for _, o := range c.obs {
+		if list := byMAC[strings.ToLower(o.MAC)]; o.MAC != "" && len(list) > 0 {
+			sort.Strings(list)
+			if len(list) > maxGlobalPerMAC {
+				list = list[:maxGlobalPerMAC]
+			}
+			cp := *o
+			cp.Details = map[string]any{DetailGlobalIPv6: list}
+			for k, v := range o.Details {
+				cp.Details[k] = v
+			}
+			o = &cp
+		}
 		if o.Details != nil {
 			if data, err := json.Marshal(o.Details); err != nil || len(data) > maxDetailsBytes {
 				o.Details = map[string]any{"truncated": true}

@@ -70,7 +70,8 @@ describe('network layout', () => {
 });
 
 describe('NetworkMapPage', () => {
-  async function setup(overview: RiskOverview | null, permissions = ['device:read', 'home:read', 'finding:read']) {
+  async function setup(overview: RiskOverview | null, permissions = ['device:read', 'home:read', 'finding:read'],
+      images: string[] = []) {
     await TestBed.configureTestingModule({
       imports: [NetworkMapPage, translocoTesting()],
       providers: [
@@ -86,6 +87,12 @@ describe('NetworkMapPage', () => {
     fixture.detectChanges();
     (await nextRequest(http, '/api/v1/homes/h1/devices')).flush([ROUTER, CAMERA, TV]);
     (await nextRequest(http, '/api/v1/homes/h1/networks')).flush([LAN]);
+    // [MOCK] images: the icon declared by the device (UPnP)
+    (await nextRequest(http, '/api/v1/homes/h1/device-images')).flush(images.map((deviceId) => ({ deviceId, source: 'DEVICE',
+      origin: 'UPNP', contentType: 'image/png', width: 120, height: 120, updatedAt: '2026-11-19T10:00:00Z', shown: true })));
+    for (const id of images) {
+      (await nextRequest(http, `/api/v1/devices/${id}/image`)).flush(new Blob(['MOCK'], { type: 'image/png' }));
+    }
     if (overview) {
       (await nextRequest(http, '/api/v1/homes/h1/risk')).flush(overview);
     }
@@ -113,6 +120,21 @@ describe('NetworkMapPage', () => {
     expect(el(page, 'points')!.textContent).toContain('−29.25');
     expect(el(page, 'details')!.textContent).toContain('Esposto a Internet');
     expect(el(page, 'device-table')!.textContent).toContain('192.168.60.40');
+  });
+
+  it('shows the image of the device instead of the category letter', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:mock-d3');
+    URL.revokeObjectURL = vi.fn();
+    const { fixture, page } = await setup(null, ['device:read', 'home:read'], ['d3']);
+    await settle();
+    fixture.detectChanges();
+    expect(page.querySelector('[data-testid="photo-d3"]')!.getAttribute('href')).toBe('blob:mock-d3');
+    expect(page.querySelector('[data-testid="photo-d2"]')).toBeNull();
+    page.querySelector<SVGGElement>('[data-testid="node-d3"]')!.dispatchEvent(new MouseEvent('click'));
+    fixture.detectChanges();
+    expect(el(page, 'detail-photo')!.getAttribute('src')).toBe('blob:mock-d3');
+    fixture.destroy();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-d3');
   });
 
   it('without finding:read shows the devices only', async () => {

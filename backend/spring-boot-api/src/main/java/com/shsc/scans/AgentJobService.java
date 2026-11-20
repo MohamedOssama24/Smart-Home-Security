@@ -20,6 +20,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.shsc.people.PeopleRepository;
+import com.shsc.people.PeopleRepository.ScanIdentity;
 import com.shsc.alerts.AlertService;
 import com.shsc.agents.auth.AgentAuthService;
 import com.shsc.agents.auth.AgentPrincipal;
@@ -29,6 +31,8 @@ import com.shsc.audit.AuditAction;
 import com.shsc.audit.AuditEvent;
 import com.shsc.audit.AuditLog;
 import com.shsc.devices.DeviceFingerprinter;
+import com.shsc.devices.images.DeviceImageRepository;
+import com.shsc.devices.images.DeviceImageRepository.ScanIcon;
 import com.shsc.findings.SecurityAnalyzer;
 import com.shsc.risk.RiskService;
 import com.shsc.networks.NetworkRange;
@@ -96,6 +100,8 @@ public class AgentJobService {
     private final ScanRepository scans;
     private final PortRepository openPorts;
     private final HomeAssistantRepository homeAssistant;
+    private final DeviceImageRepository images;
+    private final PeopleRepository people;
     private final ScanStateMachine stateMachine;
     private final ScanJobNotifier notifier;
     private final DeviceFingerprinter fingerprinter;
@@ -111,6 +117,7 @@ public class AgentJobService {
     private final Clock clock;
 
     public AgentJobService(ScanRepository scans, PortRepository openPorts, HomeAssistantRepository homeAssistant,
+            DeviceImageRepository images, PeopleRepository people,
             ScanStateMachine stateMachine,
             ScanJobNotifier notifier, DeviceFingerprinter fingerprinter, SecurityAnalyzer analyzer, RiskService risk,
             AlertService alerts, JobSigner signer,
@@ -120,6 +127,8 @@ public class AgentJobService {
         this.scans = scans;
         this.openPorts = openPorts;
         this.homeAssistant = homeAssistant;
+        this.images = images;
+        this.people = people;
         this.stateMachine = stateMachine;
         this.notifier = notifier;
         this.fingerprinter = fingerprinter;
@@ -187,6 +196,17 @@ public class AgentJobService {
 
     public BatchAck results(AgentPrincipal agent, UUID scanId, int batchSeq, List<Observation> observations,
             List<Port> ports, Inventory inventory, String rawBody) {
+        return results(agent, scanId, batchSeq, observations, ports, inventory, List.of(), rawBody);
+    }
+
+    public BatchAck results(AgentPrincipal agent, UUID scanId, int batchSeq, List<Observation> observations,
+            List<Port> ports, Inventory inventory, List<ScanIcon> icons, String rawBody) {
+        return results(agent, scanId, batchSeq, observations, ports, inventory, icons, List.of(), rawBody);
+    }
+
+    public BatchAck results(AgentPrincipal agent, UUID scanId, int batchSeq, List<Observation> observations,
+            List<Port> ports, Inventory inventory, List<ScanIcon> icons, List<ScanIdentity> identities,
+            String rawBody) {
         agentAuth.requireHome(agent);
         return tx.execute(status -> {
             Scan scan = ownScan(agent, scanId);
@@ -232,6 +252,26 @@ public class AgentJobService {
                     outOfScope.add(inventory.ip());
                 }
             }
+            // M23: device icons, only from addresses of the authorized networks of the scan
+            List<ScanIcon> iconsInScope = new ArrayList<>();
+            for (ScanIcon i : icons) {
+                if (targets.stream().anyMatch(t -> t.contains(i.ip()))) {
+                    Instant at = i.observedAt().isAfter(now.plus(MAX_FUTURE_SKEW)) ? now : i.observedAt();
+                    iconsInScope.add(new ScanIcon(i.ip(), i.origin(), i.info(), i.data(), at));
+                } else {
+                    outOfScope.add(i.ip());
+                }
+            }
+            // M24: identities, only for addresses of the authorized networks of the scan
+            List<ScanIdentity> identitiesInScope = new ArrayList<>();
+            for (ScanIdentity i : identities) {
+                if (targets.stream().anyMatch(t -> t.contains(i.ip()))) {
+                    Instant at = i.observedAt().isAfter(now.plus(MAX_FUTURE_SKEW)) ? now : i.observedAt();
+                    identitiesInScope.add(new ScanIdentity(i.ip(), i.account(), i.source(), at));
+                } else {
+                    outOfScope.add(i.ip());
+                }
+            }
             int dropped = outOfScope.size(); // distinct addresses, as in M6-M8
             String sha = HexFormat.of().formatHex(SecureTokens.sha256(rawBody));
             if (!scans.insertBatch(scan.tenantId(), scanId, batchSeq, sha, inScope.size(), portsInScope.size(), dropped,
@@ -240,6 +280,8 @@ public class AgentJobService {
             }
             inScope.forEach(o -> scans.insertObservation(scan.tenantId(), scanId, o));
             portsInScope.forEach(p -> openPorts.insert(scan.tenantId(), scanId, p));
+            iconsInScope.forEach(i -> images.insertScanIcon(scan.tenantId(), scanId, i));
+            identitiesInScope.forEach(i -> people.insertIdentity(scan.tenantId(), scanId, i));
             if (haInScope != null && !homeAssistant.insert(scan.tenantId(), scanId, haInScope)) {
                 throw ApiException.conflict("HOME_ASSISTANT_ALREADY_UPLOADED",
                         "The Home Assistant inventory of this scan was already received.");
@@ -251,7 +293,9 @@ public class AgentJobService {
                         .detail("batchSeq", batchSeq).detail("dropped", dropped)
                         .detail("addresses", outOfScope.stream().limit(10).toList()).build());
             }
-            return new BatchAck(inScope.size() + portsInScope.size() + (haInScope == null ? 0 : 1), dropped, false);
+            return new BatchAck(inScope.size() + portsInScope.size() + iconsInScope.size() + identitiesInScope.size()
+                    + (haInScope == null ? 0 : 1),
+                    dropped, false);
         });
     }
 

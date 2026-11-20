@@ -197,6 +197,48 @@ class DeviceInventoryTest extends IntegrationTest {
         assertThat(cleared.json().get("suggestedCategory").isNull()).isTrue();
     }
 
+    @Test
+    void pingOnlyTwinsAreMergedAndOfflineDevicesAreClassifiedAgain() throws Exception {
+        // [MOCK] three hosts; .51 answers ping only in the first scan
+        String plug = "10:d5:61:00:62:50", pc = "00:11:22:00:62:52", newcomer = "00:11:22:00:62:51";
+        Account owner = accounts().individual();
+        String home = Fixtures.createHome(owner, "Casa doppioni");
+        String network = Fixtures.createNetwork(owner, home, "192.168.62.0/24");
+        assertThat(owner.api().post("/api/v1/networks/" + network + "/authorization",
+                Map.of("attestation", true, "attestationVersion", "1")).status()).isEqualTo(200);
+        EnrolledAgent agent = agents().enroll(owner, home);
+        assertThat(agents().as(agent).post("/api/v1/agent/heartbeat", Map.of("schemaVersion", 1,
+                "agentVersion", "0.8.0", "uptimeSeconds", 5, "interfacesHash", "d".repeat(64), "queueDepth", 0,
+                "capabilities", Map.of("privileged", false, "arp", "os_api", "icmp", "os_api", "warnings", List.of())))
+                .status()).isEqualTo(200);
+        scan(owner, home, agent, List.of(
+                obs("192.168.62.50", plug, "ARP", null, null),
+                obs("192.168.62.51", null, "ICMP", null, Map.of("ttl", 64)),
+                obs("192.168.62.52", pc, "ARP", null, null)));
+        JsonNode first = owner.api().get("/api/v1/homes/" + home + "/devices").json();
+        assertThat(first.size()).isEqualTo(3);
+        assertThat(find(first, plug).get("manufacturer").isNull()).isTrue();
+
+        // registry imported later; second scan: the plug is offline, .51 now gives its MAC, the PC answers ping only
+        tx.executeWithoutResult(s -> oui.replace("MA-L", List.of(
+                new Entry("10D561", 24, "Tuya Smart Inc.", "MA-L")), Instant.now()));
+        scan(owner, home, agent, List.of(
+                obs("192.168.62.51", newcomer, "ARP", null, null),
+                obs("192.168.62.52", null, "ICMP", null, Map.of("ttl", 128))));
+
+        JsonNode after = owner.api().get("/api/v1/homes/" + home + "/devices").json();
+        assertThat(after.size()).as(after.toString()).isEqualTo(3); // no address-only device left
+        for (JsonNode d : after) {
+            assertThat(d.path("mac").isNull()).as(d.toString()).isFalse();
+        }
+        assertThat(find(after, pc).get("lastScanId").asString())
+                .isEqualTo(find(after, newcomer).get("lastScanId").asString());
+        JsonNode offline = find(after, plug);
+        assertThat(offline.get("manufacturer").asString()).isEqualTo("Tuya Smart Inc.");
+        assertThat(offline.get("category").asString()).isEqualTo("IOT");
+        assertThat(offline.get("lastScanId").asString()).isEqualTo(find(first, plug).get("lastScanId").asString());
+    }
+
     private static JsonNode field(JsonNode device, String name) {
         for (JsonNode i : device.get("identifications")) {
             if (name.equals(i.get("field").asString())) {

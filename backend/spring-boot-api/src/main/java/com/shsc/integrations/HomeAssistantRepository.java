@@ -83,6 +83,15 @@ public class HomeAssistantRepository {
                 .optional();
     }
 
+    /** Devices of the Home Assistant registry of a scan by each of their MACs (M20 identification). */
+    public java.util.Map<String, GatewayDevice> devicesByMac(UUID scanId) {
+        java.util.Map<String, GatewayDevice> out = new java.util.HashMap<>();
+        for (StoredDevice d : devices(scanId)) {
+            d.device().macs().forEach(m -> out.putIfAbsent(m.toLowerCase(java.util.Locale.ROOT), d.device()));
+        }
+        return out;
+    }
+
     private List<StoredDevice> devices(UUID scanId) {
         return jdbc.sql("""
                 SELECT g.name, g.manufacturer, g.model, g.sw_version, g.protocol, array_to_string(g.macs, ',') AS macs,

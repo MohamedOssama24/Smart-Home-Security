@@ -97,6 +97,28 @@ type ResultsBatch struct {
 	Observations  []Observation  `json:"observations"`
 	Ports         []PortResult   `json:"ports,omitempty"`
 	HomeAssistant *HomeAssistant `json:"homeAssistant,omitempty"`
+	Icons         []DeviceIcon   `json:"icons,omitempty"`
+	Identities    []Identity     `json:"identities,omitempty"`
+}
+
+// Identity is the account last seen on an IP address of the home (M24, ADR-083): Source is
+// DIRECTORY (Active Directory logons) or FIREWALL (Sophos authentications).
+type Identity struct {
+	IP         string    `json:"ip"`
+	Account    string    `json:"account"`
+	Source     string    `json:"source"`
+	ObservedAt time.Time `json:"observedAt"`
+}
+
+// DeviceIcon is the icon a device declares about itself (M23, ADR-077); Data is sent in base64.
+type DeviceIcon struct {
+	IP          string    `json:"ip"`
+	Origin      string    `json:"origin"`
+	ContentType string    `json:"contentType"`
+	Width       int       `json:"width"`
+	Height      int       `json:"height"`
+	Data        []byte    `json:"data"`
+	ObservedAt  time.Time `json:"observedAt"`
 }
 
 // Completion closes a scan once all its batches were uploaded.

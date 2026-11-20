@@ -9,6 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Value and confidence of every identity field (docs/07-DISCOVERY-FINGERPRINTING.md §3).
@@ -27,20 +28,46 @@ import java.util.Set;
  */
 public final class FieldResolver {
 
-    public enum Field { IP, MAC, MANUFACTURER, HOSTNAME, DEVICE_TYPE, MODEL, OS, FIRMWARE }
+    public enum Field { IP, MAC, MANUFACTURER, HOSTNAME, DEVICE_TYPE, MODEL, OS, FIRMWARE, PRODUCT_CODE, CPE }
 
     public enum Reliability { H, M, L }
 
-    public record Candidate(String value, String source, Reliability reliability) {
+    /**
+     * M20 (ADR-076): VERIFIED = declared by the device itself (or observed directly, IP/MAC),
+     * confirmed by the user, or two concordant sources with different origins, without
+     * conflicts; PROBABLE = any other value; UNKNOWN = no value.
+     */
+    public enum Status { VERIFIED, PROBABLE, UNKNOWN }
+
+    /**
+     * A candidate value. {@code origin}: the original information it derives from (two sources
+     * with the same origin are not independent: the host names of the router's tables and of the
+     * reverse DNS repeat the same announcement of the device); {@code declared}: the
+     * device states the value itself (UPnP descriptor, mDNS TXT, IPP) or it was observed directly.
+     */
+    public record Candidate(String value, String source, Reliability reliability, String origin, boolean declared) {
+        public Candidate(String value, String source, Reliability reliability) {
+            this(value, source, reliability, source, false);
+        }
     }
 
     /** One source of the chosen value, or of a conflicting one. */
-    public record Source(String source, String value, Reliability reliability, boolean agrees) {
+    public record Source(String source, String value, Reliability reliability, boolean agrees, String origin,
+            boolean declared) {
     }
 
     public record Identification(Field field, String value, Confidence confidence, List<Source> sources,
-            boolean conflict) {
+            boolean conflict, Status status) {
     }
+
+    /** Origins (M20): independence of the sources. */
+    static final String ORIGIN_OUI = "OUI";
+    static final String ORIGIN_NAME = "NAME_ANNOUNCEMENT";
+    static final String ORIGIN_HOME_ASSISTANT = "HOME_ASSISTANT";
+    public static final String SOURCE_USER = "USER";
+    private static final Set<String> DIRECT = Set.of("ARP", "NDP", "SELF");
+    private static final Pattern CORPORATE_SUFFIX = Pattern.compile(
+            "(?i)[,.]?\\s+(inc|ltd|llc|corp|corporation|co|gmbh|ag|s\\.?p\\.?a|s\\.?r\\.?l|limited)\\.?$");
 
     /** OS values (docs/07 §4); TTL 64 only supports the Unix-like family, it never names one. */
     public enum Os { WINDOWS, LINUX, MACOS, ANDROID, IOS, EMBEDDED_LINUX }
@@ -64,13 +91,73 @@ public final class FieldResolver {
         put(out, os(host));
         if (c.category() != DeviceCategory.UNKNOWN_DEVICE) {
             List<Source> sources = c.matches().stream().filter(m -> m.category() == c.category())
-                    .map(m -> new Source(String.join("+", m.sources()), m.ruleId(), reliability(m.strength()), true))
+                    .map(m -> new Source(String.join("+", m.sources()), m.ruleId(), reliability(m.strength()), true,
+                            "RULES", false))
                     .toList();
+            // derived by rules, never declared: VERIFIED only through the user's manual category
             out.put(Field.DEVICE_TYPE, new Identification(Field.DEVICE_TYPE, c.category().name(), c.confidence(),
-                    sources, !c.conflicts().isEmpty()));
+                    sources, !c.conflicts().isEmpty(), Status.PROBABLE));
         }
-        // FIRMWARE: no source reports it reliably before service detection (M9): not determined
+        put(out, resolve(Field.PRODUCT_CODE, productCodeCandidates(host)));
+        put(out, resolve(Field.FIRMWARE, firmwareCandidates(host)));
+        put(out, cpe(out.get(Field.MANUFACTURER), out.get(Field.MODEL)));
         return out;
+    }
+
+    /**
+     * Applies a value confirmed by the user (M20): VERIFIED and kept by the scans; a different
+     * scanned value stays among the sources and marks a conflict.
+     */
+    public static Identification confirmed(Field field, String value, Identification scanned) {
+        List<Source> sources = new ArrayList<>();
+        sources.add(new Source(SOURCE_USER, value, Reliability.H, true, SOURCE_USER, true));
+        boolean conflict = false;
+        if (scanned != null) {
+            boolean agrees = key(field, scanned.value()).equals(key(field, value));
+            conflict = !agrees;
+            scanned.sources().stream().filter(Source::agrees).limit(11)
+                    .forEach(s -> sources.add(new Source(s.source(), s.value(), s.reliability(), agrees, s.origin(),
+                            s.declared())));
+        }
+        return new Identification(field, truncate(value), Confidence.HIGH, List.copyOf(sources), conflict,
+                Status.VERIFIED);
+    }
+
+    /**
+     * CPE 2.3 of the hardware from maker and model (M20). The vendor/product names of the NVD
+     * dictionary often differ from the declared ones (ambiguous for IoT): always PROBABLE,
+     * VERIFIED only when the user confirms it.
+     */
+    static Optional<Identification> cpe(Identification maker, Identification model) {
+        if (maker == null || model == null) {
+            return Optional.empty();
+        }
+        String vendor = cpeComponent(CORPORATE_SUFFIX.matcher(maker.value().trim()).replaceAll(""));
+        String product = cpeComponent(model.value());
+        if (vendor.isEmpty() || product.isEmpty()) {
+            return Optional.empty();
+        }
+        String value = "cpe:2.3:h:" + vendor + ":" + product + ":*:*:*:*:*:*:*:*";
+        Confidence confidence = maker.confidence().compareTo(model.confidence()) <= 0 ? maker.confidence()
+                : model.confidence();
+        List<Source> sources = List.of(new Source("DERIVED", maker.value() + " / " + model.value(), Reliability.L,
+                true, "MANUFACTURER+MODEL", false));
+        return Optional.of(new Identification(Field.CPE, truncate(value), confidence, sources, false,
+                Status.PROBABLE));
+    }
+
+    /** Lower case, spaces as underscores, CPE 2.3 special characters escaped, non-ASCII dropped. */
+    static String cpeComponent(String value) {
+        String v = value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", "_");
+        StringBuilder out = new StringBuilder();
+        for (char ch : v.toCharArray()) {
+            if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '-' || ch == '.') {
+                out.append(ch);
+            } else if (ch > 0x20 && ch < 0x7f) {
+                out.append('\\').append(ch);
+            }
+        }
+        return out.length() > 100 ? out.substring(0, 100) : out.toString();
     }
 
     /** Overall confidence: from the device type and the maker; HIGH needs both. */
@@ -108,11 +195,29 @@ public final class FieldResolver {
             confidence = confidence.lower();
         }
         List<Source> sources = new ArrayList<>();
-        winner.values().forEach(c -> sources.add(new Source(c.source(), c.value(), c.reliability(), true)));
+        winner.values().forEach(c -> sources.add(new Source(c.source(), c.value(), c.reliability(), true, c.origin(),
+                c.declared())));
         ranked.stream().skip(1).flatMap(g -> g.values().stream())
-                .forEach(c -> sources.add(new Source(c.source(), c.value(), c.reliability(), false)));
+                .forEach(c -> sources.add(new Source(c.source(), c.value(), c.reliability(), false, c.origin(),
+                        c.declared())));
         return Optional.of(new Identification(field, truncate(display.value()), confidence,
-                List.copyOf(sources.subList(0, Math.min(sources.size(), 12))), conflict));
+                List.copyOf(sources.subList(0, Math.min(sources.size(), 12))), conflict, status(winner, conflict)));
+    }
+
+    /**
+     * VERIFIED: no conflict, and the device declares the value, or two concordant sources of
+     * different origins, each at least M (heuristics never verify a value).
+     */
+    static Status status(Map<String, Candidate> winner, boolean conflict) {
+        if (conflict) {
+            return Status.PROBABLE;
+        }
+        if (winner.values().stream().anyMatch(Candidate::declared)) {
+            return Status.VERIFIED;
+        }
+        long origins = winner.values().stream().filter(c -> c.reliability() != Reliability.L)
+                .map(Candidate::origin).distinct().count();
+        return origins >= 2 ? Status.VERIFIED : Status.PROBABLE;
     }
 
     private static Confidence confidence(Map<String, Candidate> group) {
@@ -138,7 +243,7 @@ public final class FieldResolver {
         return group.values().stream().map(Candidate::reliability).min(Comparator.naturalOrder()).orElseThrow();
     }
 
-    private static String key(Field field, String value) {
+    public static String key(Field field, String value) {
         String v = value.trim().toLowerCase(Locale.ROOT);
         if (field == Field.HOSTNAME) {
             int dot = v.indexOf('.');
@@ -160,7 +265,7 @@ public final class FieldResolver {
                 case "ARP", "NDP", "SELF", "TR064", "SNMP" -> Reliability.H;
                 default -> Reliability.M;
             };
-            out.add(new Candidate(ip, method, r));
+            out.add(new Candidate(ip, method, r, method, DIRECT.contains(method)));
         }
         return out;
     }
@@ -169,7 +274,7 @@ public final class FieldResolver {
         List<Candidate> out = new ArrayList<>();
         for (String method : host.methods()) {
             if (Set.of("ARP", "NDP", "SELF", "TR064", "SNMP").contains(method)) {
-                out.add(new Candidate(host.mac(), method, Reliability.H));
+                out.add(new Candidate(host.mac(), method, Reliability.H, method, DIRECT.contains(method)));
             }
         }
         return out;
@@ -180,7 +285,11 @@ public final class FieldResolver {
         for (Signal s : host.all("hostname")) {
             Reliability r = HostEvidence.fromRouterTable(s) ? Reliability.H
                     : s.source().equals("RDNS") ? Reliability.L : Reliability.M;
-            out.add(new Candidate(s.value(), s.source(), r));
+            // the device announcing its own name (mDNS, NetBIOS, a router describing itself); the
+            // router's tables and the reverse DNS repeat the same announcement (same origin)
+            boolean declared = s.source().equals("MDNS") || s.source().equals("NETBIOS")
+                    || s.source().endsWith("_SELF");
+            out.add(new Candidate(s.value(), s.source(), r, declared ? s.source() : ORIGIN_NAME, declared));
         }
         host.all("ssdp.friendlyName").forEach(s -> out.add(new Candidate(s.value(), "SSDP", Reliability.L)));
         return out;
@@ -188,25 +297,52 @@ public final class FieldResolver {
 
     private static List<Candidate> manufacturerCandidates(HostEvidence host) {
         List<Candidate> out = new ArrayList<>();
-        host.all("mdns.maker").forEach(s -> out.add(new Candidate(s.value(), "MDNS", Reliability.M)));
-        host.all("ssdp.manufacturer").forEach(s -> out.add(new Candidate(s.value(), "SSDP", Reliability.M)));
-        host.all("router.manufacturer").forEach(s -> out.add(new Candidate(s.value(), s.source(), Reliability.M)));
+        host.all("mdns.maker").forEach(s -> out.add(declared(s, "MDNS")));
+        host.all("ssdp.manufacturer").forEach(s -> out.add(declared(s, "SSDP")));
+        // the router describing itself (TR-064 DeviceInfo, SNMP): declared by the device
+        host.all("router.manufacturer").forEach(s -> out.add(declared(s, s.source())));
+        host.all("ha.manufacturer").forEach(s -> out.add(homeAssistant(s)));
         // maker of the network card, often not the brand of the product: weak hint only
-        host.all("oui").forEach(s -> out.add(new Candidate(s.value(), "OUI", Reliability.L)));
+        host.all("oui").forEach(s -> out.add(new Candidate(s.value(), "OUI", Reliability.L, ORIGIN_OUI, false)));
         return out;
     }
 
     private static List<Candidate> modelCandidates(HostEvidence host) {
         List<Candidate> out = new ArrayList<>();
-        host.all("mdns.model").forEach(s -> out.add(new Candidate(s.value(), "MDNS", Reliability.M)));
+        host.all("mdns.model").forEach(s -> out.add(declared(s, "MDNS")));
         host.all("ssdp.modelName").forEach(s -> {
             String number = host.all("ssdp.modelNumber").stream().map(Signal::value).findFirst().orElse(null);
             String model = number == null || s.value().contains(number) ? s.value() : s.value() + " " + number;
-            out.add(new Candidate(model, "SSDP", Reliability.M));
+            out.add(new Candidate(model, "SSDP", Reliability.M, "SSDP", true));
         });
-        host.all("ipp.model").forEach(s -> out.add(new Candidate(s.value(), "IPP", Reliability.M)));
-        host.all("router.model").forEach(s -> out.add(new Candidate(s.value(), s.source(), Reliability.M)));
+        host.all("ipp.model").forEach(s -> out.add(declared(s, "IPP")));
+        host.all("router.model").forEach(s -> out.add(declared(s, s.source())));
+        host.all("ha.model").forEach(s -> out.add(homeAssistant(s)));
         return out;
+    }
+
+    /** Product code / model number (M20): declared by the UPnP descriptor. */
+    private static List<Candidate> productCodeCandidates(HostEvidence host) {
+        return host.all("ssdp.modelNumber").stream().map(s -> declared(s, "SSDP")).toList();
+    }
+
+    /** Firmware (M20): declared by IPP, the UPnP descriptor, mDNS TXT; reported by Home Assistant. */
+    private static List<Candidate> firmwareCandidates(HostEvidence host) {
+        List<Candidate> out = new ArrayList<>();
+        host.all("ipp.firmware").forEach(s -> out.add(declared(s, "IPP")));
+        host.all("ssdp.firmware").forEach(s -> out.add(declared(s, "SSDP")));
+        host.all("mdns.firmware").forEach(s -> out.add(declared(s, "MDNS")));
+        host.all("ha.firmware").forEach(s -> out.add(homeAssistant(s)));
+        return out;
+    }
+
+    private static Candidate declared(Signal s, String source) {
+        return new Candidate(s.value(), source, Reliability.M, source, true);
+    }
+
+    /** Home Assistant registry: an integration configured by the user; independent origin, not the device. */
+    private static Candidate homeAssistant(Signal s) {
+        return new Candidate(s.value(), ORIGIN_HOME_ASSISTANT, Reliability.M, ORIGIN_HOME_ASSISTANT, false);
     }
 
     /**
@@ -217,14 +353,15 @@ public final class FieldResolver {
     private static Optional<Identification> os(HostEvidence host) {
         List<Candidate> out = new ArrayList<>();
         if (!host.all("mdns.osxvers").isEmpty()) {
-            out.add(new Candidate(Os.MACOS.name(), "MDNS", Reliability.M));
+            out.add(new Candidate(Os.MACOS.name(), "MDNS", Reliability.M, "MDNS", true)); // declared version
         }
         for (Signal s : host.all("mdns.model")) {
+            // inferred from the model name, not declared
             String m = s.value().toLowerCase(Locale.ROOT);
             if (m.startsWith("iphone") || m.startsWith("ipad")) {
-                out.add(new Candidate(Os.IOS.name(), "MDNS", Reliability.M));
+                out.add(new Candidate(Os.IOS.name(), "MDNS", Reliability.M, "MDNS_MODEL", false));
             } else if (m.matches("^(macbook|imac|macmini|macpro|mac-?studio|mac\\d).*")) {
-                out.add(new Candidate(Os.MACOS.name(), "MDNS", Reliability.M));
+                out.add(new Candidate(Os.MACOS.name(), "MDNS", Reliability.M, "MDNS_MODEL", false));
             }
         }
         for (Signal s : host.all("ssdp.server")) {
@@ -268,7 +405,8 @@ public final class FieldResolver {
         Optional<Identification> resolved = resolve(Field.OS, out);
         // the TTL alone: at most LOW
         return resolved.map(id -> id.sources().stream().filter(Source::agrees).allMatch(s -> s.source().equals("TTL"))
-                ? new Identification(id.field(), id.value(), Confidence.LOW, id.sources(), id.conflict())
+                ? new Identification(id.field(), id.value(), Confidence.LOW, id.sources(), id.conflict(),
+                        id.status())
                 : id);
     }
 
@@ -284,7 +422,7 @@ public final class FieldResolver {
         id.ifPresent(i -> out.put(i.field(), i));
     }
 
-    private static String truncate(String v) {
+    static String truncate(String v) {
         String t = v.trim();
         return t.length() <= MAX_VALUE ? t : t.substring(0, MAX_VALUE);
     }

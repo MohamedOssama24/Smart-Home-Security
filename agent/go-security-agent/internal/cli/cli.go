@@ -43,6 +43,8 @@ Commands:
   rotate-key  Replace the agent key (the old key stops working immediately)
   router      Configure the read-only router integrations (TR-064, SNMP) with your credentials
   homeassistant  Configure the read-only Home Assistant integration with your long-lived token
+  directory      Configure the read-only Active Directory logons integration (who uses which IP)
+  sophos         Configure the passive Sophos Firewall syslog integration (who uses which IP)
   version     Print version information (use --json for machine-readable output)
   help        Show this help
 
@@ -77,6 +79,10 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runVersion(args[1:], stdout, stderr)
 	case "router":
 		return runRouter(args[1:], stdout, stderr)
+	case "directory":
+		return runDirectory(args[1:], stdout, stderr)
+	case "sophos":
+		return runSophos(args[1:], stdout, stderr)
 	case "homeassistant":
 		return runHomeAssistant(args[1:], stdout, stderr)
 	case "help", "-h", "--help":

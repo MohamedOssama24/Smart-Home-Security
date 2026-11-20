@@ -3,7 +3,7 @@
 **Ultimo aggiornamento**: 19/11/2026
 **Posizione**: `C:\Users\mohamed\Desktop\smart-home-security-check` (repository git dedicato, branch `main`; commit iniziale `4b89721` pubblicato su GitHub `MohamedOssama24/Smart-Home-Security`; M5–M18 committate sul branch `release/m5-m18`)
 **Milestone corrente**: 18 — Hardening, test e rilascio → **COMPLETATA e approvata** (19/11/2026; restano verifiche che richiedono risorse del titolare: vedi Riepilogo M18)
-**Prossima milestone**: nessuna (M18 è l'ultima della roadmap): rilascio dopo approvazione
+**Prossima milestone**: 19 — Inventario e storico indirizzi e 20 — Identificazione e scheda dispositivo → **implementate, in attesa di approvazione** (roadmap M19–M23 approvata il 19/11/2026, vedi [docs/29-ROADMAP-M19-M23.md](docs/29-ROADMAP-M19-M23.md))
 
 ## Milestone
 | # | Milestone | Stato |
@@ -26,6 +26,59 @@
 | 16 | AI Security Assistant | ✅ Completata e approvata |
 | 17 | SaaS, Stripe e White Label | ✅ Completata e approvata (prova con Stripe test mode reale e doppio checkout rimandati alla M18) |
 | 18 | Hardening, test e rilascio | ✅ Completata e approvata (Stripe reale, LAN reale, dispositivo mobile/FCM da fare con risorse del titolare) |
+| 19 | Inventario completo: interfacce, IPv4/IPv6, MAC, storico indirizzi | 🟡 Implementata, in attesa di approvazione (E2E su VM da eseguire) |
+| 20 | Identificazione: verificato/probabile/sconosciuto, fonti indipendenti, nome, codice prodotto, firmware | 🟡 Implementata, in attesa di approvazione (SNMP ed E2E su VM da fare) |
+| 21 | Problemi di sicurezza e CVE: evidenze, spiegazioni, rimedi, esclusioni tracciate e reversibili | ⏳ Pianificata (priorità alta; dipende da M20) |
+| 22 | Monitoraggio: scansioni automatiche configurabili e sospendibili, nuove CVE, cambi firmware, storico notifiche | ⏳ Pianificata (priorità alta; dipende da M20 e M21) |
+| 23 | Immagini dispositivi con licenze verificabili e fallback per categoria | ⏳ Pianificata (priorità media; dipende da M20) |
+| 24 | Associazione dispositivo-persona: assegnazione manuale e fonti autorizzate (Home Assistant, router), privacy | 🟡 Implementata, in attesa di approvazione: parte 1 (persone, nomi dei dispositivi, ADR-081); parti 2–3 (accessi Active Directory e syslog Sophos dall'agent, ADR-083, V024), testate solo con dati MOCK. Vedi [docs/30](docs/30-DEVICE-PEOPLE.md) |
+
+Dettagli, rischi e criteri di completamento M19–M24: [docs/29-ROADMAP-M19-M23.md](docs/29-ROADMAP-M19-M23.md).
+
+## Milestone 20 — Riepilogo
+Decisioni in ADR-076; criteri in [docs/29-ROADMAP-M19-M23.md](docs/29-ROADMAP-M19-M23.md).
+
+### Funzionalità implementate
+- V019: stato `VERIFIED`/`PROBABLE` in `device_identifications` (+ campi `PRODUCT_CODE`, `CPE`), `devices.custom_name`, `device_identity_confirmations`, `device_identification_history` (RLS).
+- Ogni fonte registra origine e se il dato è dichiarato dal dispositivo; "Verificato" solo con dato dichiarato, conferma dell'utente o due origini indipendenti concordanti; conflitto → "Probabile". CPE derivato sempre "Probabile".
+- Nuove fonti: firmware da descrittore UPnP (`firmwareVersion`/`softwareVersion`, agent), TXT mDNS, IPP; produttore/modello/firmware da Home Assistant (origine indipendente, non dichiarazione).
+- Conferma/correzione dei campi (`PUT /devices/{id}/identity`) e nome personalizzato (`PUT /devices/{id}/name`), mai sovrascritti dalle scansioni; storico dei cambi (SCAN/USER); audit.
+- Dashboard Angular: scheda dispositivo con stato, fonti e confidenza per campo, conferma/correzione, nome personalizzato, storico.
+- App Flutter (sola lettura): nome personalizzato come titolo, scheda con stato per campo (Verificato/Probabile/Sconosciuto), fonti, conferma dell'utente, conflitti, storico identificazione; IT/EN. Le correzioni restano nella dashboard web.
+
+### Test
+- Backend mirati: 49/49 (nuovi `IdentityStatusTest` 6/6 su dataset MOCK, `DeviceIdentityTest` 1/1; regressioni `ScanWorkflowTest`, `DatabaseBaselineTest`, fingerprint, inventario). Agent Go discovery OK. Angular `devices.page.spec` 10/10.
+- Flutter: `flutter analyze` senza problemi; `dashboard_test` + `auth_test` 8/8 (dati MOCK).
+
+### Limiti
+- SNMP non collegato: si farà solo con community inserita dall'utente, mai credenziali predefinite (`public` escluso).
+- Rimuovere una conferma riporta il valore delle fonti come "Probabile" fino alla scansione successiva.
+
+### Prove E2E mancanti (non eseguite: richiedono di ricostruire immagini Docker o altro spazio)
+- M19 dual-stack e M20 identificazione sulle VM di `172.20.204.0/22`: serve ricostruire lo stack locale per applicare V018/V019.
+- Dashboard e app contro il backend reale con dati M20 (oggi provate solo su API MOCK).
+- SNMP con community inserita dall'utente: in attesa dell'implementazione.
+- Suite completa backend/frontend/agent: non eseguita su indicazione; eseguiti solo i test mirati.
+
+## Milestone 19 — Riepilogo
+Decisioni in ADR-074; piano e criteri in [docs/29-ROADMAP-M19-M23.md](docs/29-ROADMAP-M19-M23.md).
+
+### Funzionalità implementate
+- V018: `device_interfaces` (MAC per dispositivo, produttore OUI, interfaccia dell'agent) e `device_addresses` (storico IPv4/IPv6 con prima/ultima rilevazione, MAC, numero di scansioni), con RLS; backfill dall'inventario M8.
+- Identità del dispositivo tramite una qualsiasi delle sue interfacce; gruppi di osservazioni con MAC dello stesso dispositivo uniti in un unico aggiornamento.
+- IPv6 senza MAC associati al dispositivo tramite EUI-64 (solo se il MAC è visto nella scansione o è già un'interfaccia nota).
+- Classificazione degli indirizzi (`Addresses`): famiglia, ambito, identificativo EUI-64 o casuale. Conservazione: IPv6 globali casuali eliminati dopo 30 giorni, massimo 256 indirizzi per dispositivo.
+- "Probabilmente lo stesso dispositivo" per qualsiasi MAC con lo stesso nome; unione solo su conferma (`POST /devices/{id}/merge`) oppure esclusione (`POST /devices/{id}/same-as/dismiss`), con permesso `device:classify` e audit.
+- Dashboard Angular: tabelle interfacce e storico indirizzi, conferma dell'unione in due passaggi, "No, sono dispositivi diversi". App Flutter: interfacce e storico nella pagina dispositivo.
+
+### Test
+- Backend, suite completa: 221 eseguiti, 0 fallimenti, 1 saltato (feed reali opzionali). Nuovi: `AddressesTest` 4/4, `DeviceInterfacesTest` 1/1; `DatabaseBaselineTest` verde con le nuove tabelle.
+- Angular: 117/117 (2 nuovi). Flutter: `analyze` senza problemi, 15/15.
+
+### Limiti
+- Prova E2E dual-stack sulle VM di `172.20.204.0/22` non ancora eseguita: richiede di ricostruire lo stack locale (migrazione V018 sul database locale).
+- Gli IPv6 globali (2000::/3) sono registrati solo in modo passivo, dalla tabella dei vicini e per MAC già in ambito; mai scansionati (ADR-075).
+- L'unione non è reversibile; identificazioni, categoria e protocolli del dispositivo rimosso si ricalcolano alla scansione successiva.
 
 ## Milestone 18 — Riepilogo
 Dettagli in [docs/27-RELEASE-HARDENING.md](docs/27-RELEASE-HARDENING.md); guida utente in [docs/28-USER-GUIDE.md](docs/28-USER-GUIDE.md).

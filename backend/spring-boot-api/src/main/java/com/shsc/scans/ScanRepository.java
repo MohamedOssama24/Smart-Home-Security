@@ -257,6 +257,19 @@ public class ScanRepository {
                 .list();
     }
 
+    /** Observations of a scan linked to one device (re-classification of a device not seen since). */
+    public List<Observation> observationsOfDevice(UUID scanId, UUID deviceId) {
+        return jdbc.sql("""
+                SELECT host(ip) AS ip, mac::text AS mac, method, interface, hostname, details::text AS details,
+                    observed_at
+                FROM scan_observations WHERE scan_id = :scan AND device_id = :device ORDER BY ip, method""")
+                .param("scan", scanId).param("device", deviceId)
+                .query((rs, n) -> new Observation(rs.getString("ip"), rs.getString("mac"), rs.getString("method"),
+                        rs.getString("interface"), rs.getString("hostname"), rs.getString("details"),
+                        Sql.instant(rs, "observed_at")))
+                .list();
+    }
+
     private static Scan map(ResultSet rs, int row) throws SQLException {
         return new Scan(Sql.uuid(rs, "id"), Sql.uuid(rs, "tenant_id"), Sql.uuid(rs, "home_id"),
                 Sql.uuid(rs, "agent_id"), rs.getString("trigger"), rs.getString("profile"),
